@@ -1,0 +1,13 @@
+ipsgopen TAS .
+  inv mutex(S:Sys, P:Pid, Q:Pid) .
+  inv inv1(S:Sys, P:Pid) .
+  generate mutex(S:Sys, P:Pid, Q:Pid) induction on S:Sys .
+close
+
+set-output examples/TAS/gen-mutex.cafe .
+:save-proof .
+
+eof
+
+load examples/TAS/input-mutex.cafe .
+load examples/TAS/tas.cafe .
