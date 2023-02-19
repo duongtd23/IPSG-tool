@@ -999,7 +999,7 @@ mod CIMPA-IO is
  rl [save-opened-file] :
     openedFile(cafeInMaude, fileManager, FHOut)
     < cafeInMaude : CIM | state: saving, proof: S, AtS >
- => < cafeInMaude : CIM | state: saving, proof: S, AtS >
+ => < cafeInMaude : CIM | state: saving, proof: "", AtS >
     write(FHOut, cafeInMaude, S) .
 
  rl [save-wrote] :

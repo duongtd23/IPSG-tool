@@ -510,7 +510,7 @@ fmod TO-QID-LIST is
   op handleDownTermAC1Str : TermList Module String -> String .
   eq handleDownTermAC1Str((empty).TermList, MOD1, STR2) = "" .
   eq handleDownTermAC1Str((T1 , TEL1), MOD1, STR2) =
-    STR2 + myDownTermStr(T1, MOD1) +
+    " " + STR2 + " " + myDownTermStr(T1, MOD1) +
       handleDownTermAC1Str(TEL1, MOD1, STR2) .
 
   op qidList2Str : QidList -> String .

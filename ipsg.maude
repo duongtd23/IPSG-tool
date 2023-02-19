@@ -444,7 +444,7 @@ mod MTP is
      < cafeInMaude : CIM | state: executeComm, proof: S,
       input: ('ipsgopen_._close['token[T1], T2], TL), 
       ipsgState: < null ; null ; null >, ipsgStartTime: 0, AtS >
-  => < cafeInMaude : CIM | state: ipsgexe,  proof: "",
+  => < cafeInMaude : CIM | state: ipsgexe,  proof: S,
       input: ('ipsgopen_._close['token[T1], T2], TL), 
       ipsgState: < null ; null ; null >, ipsgStartTime: 0, AtS >
     getTimeSinceEpoch(timeManager, cafeInMaude) .
@@ -471,7 +471,7 @@ mod MTP is
   crl [ipsg-export] :
      < cafeInMaude : CIM | state: ipsgexe, proof: Text,
       ipsgState: < INSP1 ; MS1 ; PRSCS1 >, AtS >
-  => < cafeInMaude : CIM | state: ipsgfin, proof: S,
+  => < cafeInMaude : CIM | state: ipsgfin, proof: (Text + S),
       ipsgState: < INSP1 ; MS1 ; PRSCS1 >, AtS >
     getTimeSinceEpoch(timeManager, cafeInMaude)
   if INSP1 =/= null /\ MS1 =/= null /\ PRSCS1 =/= null /\

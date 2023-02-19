@@ -250,65 +250,84 @@ fmod HANDLE-EQS-CS is
   eq 2ndEqT($ EQ1 , EQ2 $) = EQ2 .
 
   op makeEqsTF : Term Module Module -> EqPair .
+  op makeEqsTF2 : Term Module Module -> EqPair .
+  op makeEqsTF3 : Term Module Module -> EqPair .
+  op makeEqsTF4 : Term Module Module -> EqPair .
+  op makeEqsTF5 : Term Module Module -> EqPair .
+
+*** if either term is "true" or "false"
   ceq makeEqsTF('_=_[TE1, TE2], MOD, PRSCMOD) = 
     $ eq TE2 = 'true.Bool [none] . , eq TE2 = 'false.Bool [none] . $
   if TE1 == 'true.Bool or TE1 == 'false.Bool .
   ceq makeEqsTF('_=_[TE1, TE2], MOD, PRSCMOD) = 
     $ eq TE1 = 'true.Bool [none] . , eq TE1 = 'false.Bool [none] . $
   if TE2 == 'true.Bool or TE2 == 'false.Bool .
+  eq makeEqsTF(TE1, MOD, PRSCMOD) = 
+    makeEqsTF2(TE1, MOD, PRSCMOD) [owise] .
 
-***(
-  making equations between two constant based on constructor
-  e.g., 0 = i should be converted to i = 0 since 0 is a ctor
-)
-  ceq makeEqsTF('_=_[TE1, TE2], MOD, PRSCMOD) =
+*** if one constant is sub-sort of the other constant
+*** e.g., op d : -> Data . op r : -> Random .
+***     then one of the two equations should be d = r (but should not r = d)
+  ceq makeEqsTF2('_=_[C1, C2], MOD, PRSCMOD)
+    = $ eq C2 = C1 [none] . , eq '_=_[C2, C1] = 'false.Bool [none] . $
+  if getType(C1) =/= getType(C2) /\
+    sortLeq(MOD, getType(C1), getType(C2)) [print C1 " 273 " C2] .
+  ceq makeEqsTF2('_=_[C1, C2], MOD, PRSCMOD)
+    = $ eq C1 = C2 [none] . , eq '_=_[C1, C2] = 'false.Bool [none] . $
+  if getType(C1) =/= getType(C2) /\
+    sortLeq(MOD, getType(C2), getType(C1)) [print C1 " 276 " C2] .
+  eq makeEqsTF2(TE1, MOD, PRSCMOD) = 
+    makeEqsTF3(TE1, MOD, PRSCMOD) [owise] .
+
+*** making equations based on constructor
+*** e.g., 0 = i should be converted to i = 0 since 0 is a ctor
+  ceq makeEqsTF3('_=_[TE1, TE2], MOD, PRSCMOD) =
     if checkExist(TE2, TE1) 
     then $ eq TE1 = TE2 [none] . , eq '_=_[TE1, TE2] = 'false.Bool [none] . $
     else $ eq TE2 = TE1 [none] . , eq '_=_[TE2, TE1] = 'false.Bool [none] . $
     fi
   if isConstructorT(TE1, getOps(MOD), MOD) .
-  ceq makeEqsTF('_=_[C1, TE2], MOD, PRSCMOD) =
+  ceq makeEqsTF3('_=_[C1, TE2], MOD, PRSCMOD) =
     $ eq TE2 = C1 [none] . , eq '_=_[TE2, C1] = 'false.Bool [none] . $
   if isConstructor(C1, getOps(MOD)) .
-  ceq makeEqsTF('_=_[TE1, TE2], MOD, PRSCMOD) =
+  ceq makeEqsTF3('_=_[TE1, TE2], MOD, PRSCMOD) =
     if checkExist(TE1, TE2) 
     then $ eq TE2 = TE1 [none] . , eq '_=_[TE2, TE1] = 'false.Bool [none] . $
     else $ eq TE1 = TE2 [none] . , eq '_=_[TE1, TE2] = 'false.Bool [none] . $
     fi
   if isConstructorT(TE2, getOps(MOD), MOD) .
-  ceq makeEqsTF('_=_[TE1, C2], MOD, PRSCMOD) =
+  ceq makeEqsTF3('_=_[TE1, C2], MOD, PRSCMOD) =
     $ eq TE1 = C2 [none] . , eq '_=_[TE1, C2] = 'false.Bool [none] . $
   if isConstructor(C2, getOps(MOD)) .
+  eq makeEqsTF3(TE1, MOD, PRSCMOD) = 
+    makeEqsTF4(TE1, MOD, PRSCMOD) [owise] .
 
-  ceq makeEqsTF('_=_[C1, C2], MOD, PRSCMOD) 
-    = $makeEqsTF(C1, C2, MOD, PRSCMOD)
-  if C1 =/= 'true.Bool /\ C1 =/= 'false.Bool /\ 
-     C2 =/= 'true.Bool /\ C2 =/= 'false.Bool /\
-     not isConstructor(C1, getOps(MOD)) /\
-     not isConstructor(C2, getOps(MOD)) . 
-  ceq makeEqsTF('_=_[TE1, C2], MOD, PRSCMOD) 
+*** none of the above
+  eq makeEqsTF4('_=_[C1, C2], MOD, PRSCMOD) 
+    = makeEqsTF5(C1, C2, MOD, PRSCMOD) . 
+  ceq makeEqsTF4('_=_[TE1, C2], MOD, PRSCMOD) 
     = $ eq TE1 = C2 [none] . , eq '_=_[TE1, C2] = 'false.Bool [none] . $ 
-  if not(TE1 :: Constant) /\
-    C2 =/= 'true.Bool /\ C2 =/= 'false.Bool /\
-    not isConstructorT(TE1, getOps(MOD), MOD) /\
-    not isConstructor(C2, getOps(MOD)) . 
-  ceq makeEqsTF('_=_[C1, TE2], MOD, PRSCMOD) 
+  if not(TE1 :: Constant) . 
+  ceq makeEqsTF4('_=_[C1, TE2], MOD, PRSCMOD) 
     = $ eq TE2 = C1 [none] . , eq '_=_[TE2, C1] = 'false.Bool [none] . $
-  if not(TE2 :: Constant) /\
-    C1 =/= 'true.Bool /\ C1 =/= 'false.Bool /\
-    not isConstructorT(TE2, getOps(MOD), MOD) /\
-    not isConstructor(C1, getOps(MOD)) . 
-  ceq makeEqsTF('_=_[TE1, TE2], MOD, PRSCMOD) = 
+  if not(TE2 :: Constant) . 
+  ceq makeEqsTF4('_=_[TE1, TE2], MOD, PRSCMOD) = 
     if checkExist(TE1, TE2) 
     then $ eq TE2 = TE1 [none] . , eq '_=_[TE2, TE1] = 'false.Bool [none] . $
-    else $makeEqsTF(TE1, TE2, MOD, PRSCMOD)
+    else makeEqsTF5(TE1, TE2, MOD, PRSCMOD)
     fi
-  if not(TE1 :: Constant) /\ not(TE2 :: Constant) /\
-    not isConstructorT(TE1, getOps(MOD), MOD) /\
-    not isConstructorT(TE2, getOps(MOD), MOD) .
-
-  eq makeEqsTF(TE1, MOD, PRSCMOD) = 
+  if not(TE1 :: Constant) /\ not(TE2 :: Constant) .
+  eq makeEqsTF4(TE1, MOD, PRSCMOD) = 
     $ eq TE1 = 'true.Bool [none] . , eq TE1 = 'false.Bool [none] . $ [owise] .
+
+*** check occurence to build equation
+  op makeEqsTF5 : Term Term Module Module -> EqPair .
+  eq makeEqsTF5(TE1, TE2, MOD, PRSCMOD) = 
+    if checkTermExistEqs(TE1, getEqs(PRSCMOD)) and
+        not(checkTermExistEqs(TE2, getEqs(PRSCMOD))) 
+    then $ eq TE2 = TE1 [none] . , eq '_=_[TE2, TE1] = 'false.Bool [none] . $
+    else $ eq TE1 = TE2 [none] . , eq '_=_[TE1, TE2] = 'false.Bool [none] . $
+    fi .
 
 ***(
   auxiliary function
@@ -322,15 +341,6 @@ fmod HANDLE-EQS-CS is
       isConstructor(C1, OPS)
     fi .
   eq isConstructor(C1, OP1 OPS) = isConstructor(C1, OPS) [owise] .
-
---- check appearance to build equation
-  op $makeEqsTF : Term Term Module Module -> EqPair .
-  eq $makeEqsTF(TE1, TE2, MOD, PRSCMOD) = 
-    if checkTermExistEqs(TE1, getEqs(PRSCMOD)) and
-        not(checkTermExistEqs(TE2, getEqs(PRSCMOD))) 
-    then $ eq TE2 = TE1 [none] . , eq '_=_[TE2, TE1] = 'false.Bool [none] . $
-    else $ eq TE1 = TE2 [none] . , eq '_=_[TE1, TE2] = 'false.Bool [none] . $
-    fi .
 
   op isConstructorT : Term OpDeclSet Module -> Bool .
   eq isConstructorT(TE1, none, MOD) = false .
@@ -1286,7 +1296,7 @@ fmod ISPG-HANDLE-INVS is
       else PRSC2
       fi
     if MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\ 
-      PRL1 := simplifyParams( MOD, 
+      PRL1 := simplifyParams(MOD, 
           getInvTargetParams(PRSC1) getInvTransParams(PRSC1),
           (nil).ParamList,
           (empty).TermList ) /\
@@ -1340,15 +1350,23 @@ fmod ISPG-HANDLE-INVS is
     doPermutateParams2(PRL1, PRL2, PRL3, PRL4) .
 
 --- remove duplicated params
+*** TODO: 
   op simplifyParams : Module ParamList ParamList TermList -> ParamList .
   eq simplifyParams(MOD, (nil).ParamList,       PRL2, TEL) = PRL2 .
+  ceq simplifyParams(MOD, param(QI1, QI2) PRL1, PRL2, TEL) 
+      = if checkIncluded(TEL, C2)
+        then simplifyParams(MOD, PRL1, PRL2, TEL)
+        else simplifyParams(MOD, PRL1, PRL2 param(getName(C2), getType(C2)), (TEL, C2))
+        fi  
+    if TE1 := getTerm(metaParse(MOD, QI1, QI2)) /\
+      C2 := getTerm(metaReduce(MOD, TE1)) .
   ceq simplifyParams(MOD, param(QI1, QI2) PRL1, PRL2, TEL) 
       = if checkIncluded(TEL, TE2)
         then simplifyParams(MOD, PRL1, PRL2, TEL)
         else simplifyParams(MOD, PRL1, PRL2 param(QI1, QI2), (TEL, TE2))
         fi  
     if TE1 := getTerm(metaParse(MOD, QI1, QI2)) /\
-      TE2 := getTerm(metaReduce(MOD, TE1)) .
+      TE2 := getTerm(metaReduce(MOD, TE1)) [owise] .
 
 ***(
   ceq handleFalseCase(PRSC1, MS1, INSP1) = 
