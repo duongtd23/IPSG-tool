@@ -271,11 +271,11 @@ fmod HANDLE-EQS-CS is
   ceq makeEqsTF2('_=_[C1, C2], MOD, PRSCMOD)
     = $ eq C2 = C1 [none] . , eq '_=_[C2, C1] = 'false.Bool [none] . $
   if getType(C1) =/= getType(C2) /\
-    sortLeq(MOD, getType(C1), getType(C2)) [print C1 " 273 " C2] .
+    sortLeq(MOD, getType(C1), getType(C2)) .
   ceq makeEqsTF2('_=_[C1, C2], MOD, PRSCMOD)
     = $ eq C1 = C2 [none] . , eq '_=_[C1, C2] = 'false.Bool [none] . $
   if getType(C1) =/= getType(C2) /\
-    sortLeq(MOD, getType(C2), getType(C1)) [print C1 " 276 " C2] .
+    sortLeq(MOD, getType(C2), getType(C1)) .
   eq makeEqsTF2(TE1, MOD, PRSCMOD) = 
     makeEqsTF3(TE1, MOD, PRSCMOD) [owise] .
 
@@ -916,8 +916,8 @@ fmod ISPG-HANDLE-INVS is
   var EQS : EquationSet .
   vars EQ1 EQ2 : Equation .
   vars ATTS : AttrSet .
-  vars TE1 TE2 TE3 TE2' : Term .
-  vars TEL TEL2 : TermList .
+  vars TE1 TE2 TE3 TE2' TE4 : Term .
+  vars TEL TEL2 TEL3 : TermList .
   vars C1 C2 C3 C4 : Constant .
   vars OPS1 OPS2 : OpDeclSet .
   vars OP1 OP2 : OpDecl .
@@ -934,7 +934,7 @@ fmod ISPG-HANDLE-INVS is
   vars CR CR1 CR2 : CheckResult .
   --- vars MITPS : MapInvTermPernSet .
   vars TES TES2 TES3 : TermSet .
-  vars MPTS MPTS2 : MapParamTS .
+  vars MPTS MPTS2 MPTS3 : MapParamTS .
   vars MITTPS : MapInvTTermPernSet .
 
 --- the last param is the effective condition
@@ -945,8 +945,13 @@ fmod ISPG-HANDLE-INVS is
     then $handleFalseCase(PRSC1, MS1, INSP1, TEL, depthTryUseLm)
     else PRSC2 
     fi
-  if PRSC2 := testUseInvs(PRSC1, MS1, getInputSpecInvs(INSP1)) .
+  if PRSC2 := 
+      if hasExistVar(getInvTargetParams(PRSC1))
+      then testUseInvsEx(PRSC1, MS1, getInputSpecInvs(INSP1))
+      else testUseInvs(PRSC1, MS1, universalInvs(getInputSpecInvs(INSP1)))
+      fi .
 
+--- the invariant does not have an existential quantifier variable
   ceq $handleFalseCase(PRSC1, MS1, INSP1, TEL, N) = 
       if PRSC2 == PRSC1 
       then 
@@ -958,35 +963,56 @@ fmod ISPG-HANDLE-INVS is
         fi
       else PRSC2
       fi
-    if INVL := getInputSpecInvs(INSP1) /\
+    if not(hasExistVar(getInvTargetParams(PRSC1))) /\
+      INVL := universalInvs(getInputSpecInvs(INSP1)) /\
       MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\
       MITTPS := genMapInvTTermPernSet(PRSC1, MOD, INVL) /\
       PRSC2 := testUseInvsT(PRSC1, MOD, INVL, MITTPS) .
 
+--- the invariant does have an existential quantifier variable
+  ceq $handleFalseCase(PRSC1, MS1, INSP1, TEL, N) = 
+      if PRSC2 == PRSC1 
+      then findLemmaEx(PRSC1, MS1, INSP1, TEL, N)
+      else PRSC2
+      fi
+    if hasExistVar(getInvTargetParams(PRSC1)) /\
+      MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\
+      PRSC2 := findWitness(PRSC1,MOD) 
+      [print "    could not find a lemma, try to find a witness..."] .
+
+  op findLemmaEx : IPSGProofScore IPSGModuleSpec IPSGInputSpec TermList Nat -> PrscList .
+  ceq findLemmaEx(PRSC1, MS1, INSP1, TEL, N) =
+      if PRSC2 == PRSC1 
+      then returnFalsePrsc(PRSC1)
+      else PRSC2
+      fi
+    if INVL := universalInvs(getInputSpecInvs(INSP1)) /\
+      MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\
+      MITTPS := genMapInvTTermPernSetEx(PRSC1, MOD, INVL) /\
+      PRSC2 := testUseInvsT(PRSC1, MOD, INVL, MITTPS) .
+
   op returnFalsePrsc : IPSGProofScore -> IPSGProofScore .
   eq returnFalsePrsc(PRSC1) = addComment2Prsc(PRSC1, 'false)
-    [print "-->  a false case"] .
+    [print "    a false case"] .
 
 ***(
   try to use an invariant as a lemma by replace the params of lemma with
   any wellFormed terms.
   e.g., inv8(s, s(next(s)), s(s(next(s)))) implies inv7....
+  for invariant without existential quantifiers
 )
-  op testUseInvsT : IPSGProofScore Module InvList 
-    MapInvTTermPernSet -> IPSGProofScore .
+  op testUseInvsT : IPSGProofScore Module InvList MapInvTTermPernSet -> IPSGProofScore .
   eq testUseInvsT(PRSC1, MOD, (nil).InvList, MITTPS) = PRSC1 .
-  eq testUseInvsT(PRSC1, MOD, INV1 INVL, 
-      (INV1 |-> | empty , empty | , MITTPS)) = testUseInvsT(PRSC1, MOD, INVL, MITTPS) .
-  ceq testUseInvsT(PRSC1, MOD, INV1 INVL, 
-      (INV1 |-> | ({TEL}, TP) , TP2 | , MITTPS)) 
+  eq testUseInvsT(PRSC1, MOD, INV1 INVL, (INV1 |-> | empty , empty | , MITTPS)) 
+    = testUseInvsT(PRSC1, MOD, INVL, MITTPS) .
+  ceq testUseInvsT(PRSC1, MOD, INV1 INVL, (INV1 |-> | ({TEL}, TP) , TP2 | , MITTPS)) 
     = if PRSC2 == PRSC1
       then testUseInvsT(PRSC1, MOD, INV1 INVL, 
           (INV1 |-> | TP , TP2 | , MITTPS)) 
       else PRSC2 
       fi
   if PRSC2 := checkLmInst(PRSC1, MOD, INV1, TEL) .
-  ceq testUseInvsT(PRSC1, MOD, INV1 INVL, 
-      (INV1 |-> | empty , ({TEL}, TP2) | , MITTPS)) 
+  ceq testUseInvsT(PRSC1, MOD, INV1 INVL, (INV1 |-> | empty , ({TEL}, TP2) | , MITTPS)) 
     = if PRSC2 == PRSC1
       then testUseInvsT(PRSC1, MOD, INV1 INVL, 
           (INV1 |-> | empty , TP2 | , MITTPS))
@@ -1188,7 +1214,7 @@ fmod ISPG-HANDLE-INVS is
        MOD1 := copyModule&AddEqs2(MOD, EQ1, 1) /\
        MOD2 := copyModule&AddEqs2(MOD, EQ2, 2) .
 
-*** build a map
+--- build a map from Invariant to TupleTermPernSet
   op genMapInvTTermPernSet : IPSGProofScore Module InvList -> MapInvTTermPernSet .
   eq genMapInvTTermPernSet(PRSC1, MOD, (nil).InvList) 
       = (empty).MapInvTTermPernSet .
@@ -1279,14 +1305,10 @@ fmod ISPG-HANDLE-INVS is
   if TE2 := getTerm(metaReduce(MOD, C1)) .
   eq $params2TermSet2(MOD, (TE1 , TEL)) = $params2TermSet2(MOD, TEL) [owise] .
 
-  op substractSet : TermPernSet TermPernSet -> TermPernSet .
-  eq substractSet(TP, empty) = TP .
-  eq substractSet(empty, TP) = empty .
-  eq substractSet(TP, { TEL }) = delete({ TEL }, TP) .
-  eq substractSet(TP, ({ TEL } , TP2) ) 
-    = substractSet(delete({ TEL }, TP), TP2) .
-
-***
+***(
+  try to instantiate lemmas by (only) fresh constants
+  for invariant without existential quantifiers
+)
   op testUseInvs : IPSGProofScore IPSGModuleSpec InvList -> IPSGProofScore .
   op $testUseInvs : IPSGProofScore Module Invariant ParamPernSet -> IPSGProofScore .
   eq testUseInvs(PRSC1, MS1, (nil).InvList) = PRSC1 .
@@ -1369,121 +1391,184 @@ fmod ISPG-HANDLE-INVS is
       TE2 := getTerm(metaReduce(MOD, TE1)) [owise] .
 
 ***(
-  ceq handleFalseCase(PRSC1, MS1, INSP1) = 
-    if PRSC2 == PRSC1 then
-      if testUseInvsT(PRSC1, MS1, INVL) == PRSC1 then
-        if tryUseMt1Lm(PRSC1, MS1, INVL, INVL, 
-            genMapInvTermPernSet(INVL, MOD, getEqs(getPrscModule(PRSC1))), 
-            (none).EquationSet, depthTryUseLm) == PRSC1 then
-          if autoGenLemmas then
-            conjectLemma(PRSC1, MS1, INSP1)
-          else
-            addComment2Prsc(PRSC1, '\r 'false '\o)
-          fi
-        else
-          tryUseMt1Lm(PRSC1, MS1, INVL, INVL, 
-            genMapInvTermPernSet(INVL, MOD, getEqs(getPrscModule(PRSC1))), 
-            (none).EquationSet, depthTryUseLm)
-        fi
-      else
-        testUseInvsT(PRSC1, MS1, INVL)
-      fi
-    else
-      PRSC2
-    fi
-    if INVL := getInputSpecInvs(INSP1) /\
-    PRSC2 := testUseInvs(PRSC1, MS1, INVL) /\
-    MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) .
-
-  op conjectLemma : IPSGProofScore IPSGModuleSpec IPSGInputSpec -> IPSGProofScore .
-  ceq conjectLemma(PRSC1, MS1, INSP1) = 
-    addComment2Prsc(
-      handleFalseCase(
-        addLemmas2Prsc(PRSC1,LM),
-        MS1,
-        addLmsInv(INSP1,lm2InvInput(LM))
-      ), 
-      '\m 'generated 'and 'used 'as 'a 'lemma '\o '\n
-      '-- tokenize(STR1) '\n 
-      '-- aEq2QidListRaw(EQ1,getPrscModule(PRSC1)))
-  if
-    N := s(getIPSGLmsNo(getPrscILemma(PRSC1))) /\
-    QI1 := handleLmName(getInvTagetName(PRSC1),N) /\
-    TEL := getFreshConstList(PRSC1) /\
-    TCL := getEqConstPairs(PRSC1) /\
-    MCV1 := generateMapConstVar(TEL,TCL) /\
-    OP1 := generateLmOpDel(QI1, MCV1) /\
-    MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\
-    EQ1 := generateLmEquation(QI1, 
-      reduceEqsSet(getEqs(getPrscModule(PRSC1)), MOD), MCV1, TCL) /\
-    LM := lm(OP1, EQ1, N) /\
-    STR1 := aOp2String(OP1) /\
-    STR2 := aEq2String(EQ1, getPrscModule(PRSC1)) .
-
-  op handleLmName : Qid Nat -> Qid .
-  ceq handleLmName(QI1,N) =
-    (if substr(STR1:String,0,2) == "lm" then
-      qid(STR1:String + "-" + string(N,10))
-    else
-      qid(prefixLmName + string(N,10))
-    fi)
-    if STR1:String := string(QI1) .
-
-  --- ceq testUseInvsT(PRSC1, MOD, INV1 INVL, (INV1 |-> | TP , TP2 | , MITTPS)) 
-  ---   = if PRSC2 == PRSC1 
-  ---     then testUseInvsT(PRSC1, MOD, INVL)
-  ---     else PRSC2
-  ---     fi 
-  --- if 
-  --- PRSC2 := doTestUseInvT(PRSC1, MOD, INV1) .
-
-  --- ceq testUseInvT(PRSC1, MOD, INV1) = 
-  ---   if TP == empty 
-  ---   then PRSC1
-  ---   else doTestUseInvT(PRSC1, MOD, INV1, TP, TP)
-  ---   fi
-  ---   if MOD := tempMod2(getPrscModule(PRSC1), MOD, getPrscILemma(PRSC1)) /\
-  ---     TES := params2TermSet(PRSC1, MOD) /\
-  ---     TP := findMatchesTL(MOD, TES, getInvParams(INV1)) .
-
-  --- eq doTestUseInvT(PRSC1, MOD, INV1, (empty).TermPernSet, TP2) 
-  ---   = if TP2 == empty
-  ---     then PRSC1 
-  ---     else testUseInvT2(PRSC1, MOD, INV1, TP2) 
-  ---     fi .
-  --- ceq doTestUseInvT(PRSC1, MOD, INV1, ({TEL}, TP), TP2) =
-  ---   (if getTerm(metaReduce(MOD, LM:Term)) == 'false.Bool or-else
-  ---       getTerm(metaReduce(MOD, TE:Term)) == 'true.Bool then
-  ---     prsc(getPrscModule(PRSC1),
-  ---       (getInvName(INV1) '`( myDownTermL(TEL, MOD) '`) ) ' 'implies 
-  ---         getPrscReductionCmd(PRSC1),
-  ---       TE:Term,
-  ---       '\g 'true '`, ' 'use getInvName(INV1) 'as 'a 'lemma '\o,
-  ---       getPrscMapEqs(PRSC1),
-  ---       getInvTagetName(PRSC1),
-  ---       getInvTargetParams(PRSC1),
-  ---       getInvTransName(PRSC1),
-  ---       getInvTransParams(PRSC1),
-  ---       getPrscILemma(PRSC1))
-  ---   else
-  ---     doTestUseInvT(PRSC1, MOD, INV1, TP, TP2)
-  ---   fi)
-  ---   if LM:Term := getInvName(INV1)[ TEL ] /\
-  ---     TE:Term := '_implies_[LM:Term, getPrscMetaReduceCmd(PRSC1)] .
-  ---     --- [print "--> trying " LM:Term] .
-
-  --- op testUseInvT2 : IPSGProofScore Module Invariant TermPernSet -> IPSGProofScore .
-  --- ceq testUseInvT2(PRSC1, MOD, INV1, TP2) = 
-  ---   if TP3 == empty 
-  ---   then PRSC1
-  ---   else doTestUseInvT(PRSC1, MOD, INV1, TP3, empty) 
-  ---   fi
-  ---   if TES := eqs2TermSet(getEqs(getPrscModule(PRSC1))) /\
-  ---     TP := findMatchesTL(MOD, TES, getInvParams(INV1)) /\
-  ---     TP3 := substractSet(TP, TP2) .
-  ---     --- N := | TP2 | /\ N2 := | TP | /\ N3 := | TP3 | [print "1172 " N " ## " N2 " ## " N3] .
-
+  try to instantiate lemmas by (only) fresh constants
+  for invariant with existential quantifiers
 )
+  op testUseInvsEx : IPSGProofScore IPSGModuleSpec InvList -> IPSGProofScore .
+  ceq testUseInvsEx(PRSC1, MS1, INVL) = 
+      if PRSC2 == PRSC1 
+      then testUseInvsExE(PRSC1, MS1, existentialInvs(INVL))
+      else PRSC2
+      fi
+    if PRSC2 := testUseInvsExU(PRSC1, MS1, universalInvs(INVL)) .
+
+***(
+  lemmas with universal quantifier variables
+)
+  op testUseInvsExU : IPSGProofScore IPSGModuleSpec InvList -> IPSGProofScore .
+  eq testUseInvsExU(PRSC1, MS1, (nil).InvList) = PRSC1 .
+  ceq testUseInvsExU(PRSC1, MS1, INV1 INVL) = 
+      if PRSC2 == PRSC1
+      then testUseInvsExU(PRSC1, MS1, INVL)
+      else PRSC2
+      fi
+    if MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\ 
+      PRL1 := simplifyParams(MOD, 
+          getUnivVars(getInvTargetParams(PRSC1)) getInvTransParams(PRSC1),
+          (nil).ParamList,
+          (empty).TermList ) /\
+      PP := permutateParams(getInvParams(INV1), PRL1) /\
+      PRSC2 := $testUseInvs(PRSC1, MOD, INV1, PP) .
+
+***(
+  lemmas with existential quantifier variables
+)
+  op testUseInvsExE : IPSGProofScore IPSGModuleSpec InvList -> IPSGProofScore .
+  eq testUseInvsExE(PRSC1, MS1, (nil).InvList) = PRSC1 .
+  ceq testUseInvsExE(PRSC1, MS1, INV1 INVL) = 
+      $testUseInvs(PRSC1, MOD, INV1, PP2)
+    if MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\ 
+      PRL1 := simplifyParams(MOD, 
+          getInvTargetParams(PRSC1) getInvTransParams(PRSC1),
+          (nil).ParamList,
+          (empty).TermList ) /\
+      PP := permutateParams(getInvParams(INV1), PRL1) /\
+      PP2 := filterOutEx(PP,getInvParams(INV1)) .
+
+***(
+  filter out invalid param list entries
+)
+  op filterOutEx : ParamPernSet ParamList -> ParamPernSet .
+  op isValidParamL : ParamList ParamList -> Bool .
+  eq filterOutEx(empty,PRL2) = empty .
+  eq filterOutEx(({ PRL1 } , PP), PRL2) = 
+    if isValidParamL(PRL1,PRL2) 
+    then ({ PRL1 } , filterOutEx(PP, PRL2))
+    else filterOutEx(PP, PRL2)
+    fi .
+  eq isValidParamL(PRL1, (nil).ParamList) = true .
+  eq isValidParamL(PA1 PRL1, PA2 PRL2) = 
+    (isExistential(PA1) == isExistential(PA2)) and
+    isValidParamL(PRL1, PRL2) .
+
+***(
+  build a map from Invariant to TupleTermPernSet
+  only consider lemmas with universal quantifier variables
+  only consider invariant params that are universal quantifiers
+  note that: only support depth = 0
+)
+  op genMapInvTTermPernSetEx : IPSGProofScore Module InvList -> MapInvTTermPernSet .
+  op genMapInvTTermPernSetEx : IPSGProofScore Module InvList -> MapInvTTermPernSet .
+  eq genMapInvTTermPernSetEx(PRSC1, MOD, (nil).InvList) 
+      = (empty).MapInvTTermPernSet .
+  ceq genMapInvTTermPernSetEx(PRSC1, MOD, INV1 INVL) = 
+      insert(INV1, | TP , substractSet(TP2, TP) |,
+        genMapInvTTermPernSetEx(PRSC1, MOD, INVL)) 
+    if TES := removeExTerm(params2TermSet(PRSC1, MOD)) /\
+      TP := findMatchesTL(MOD, TES, getInvParams(INV1)) /\
+      TES2 := removeExTerm(eqs2TermSet(getEqs(getPrscModule(PRSC1)))) /\
+      TP2 := findMatchesTL(MOD, TES2, getInvParams(INV1)) .
+
+***(
+  try to find a suitable witness for an invariant with existential quantifier variables
+)
+  op findWitness : IPSGProofScore Module -> IPSGProofScore .
+  op doFindWitness : IPSGProofScore Module TermPernSet -> IPSGProofScore .
+  ceq findWitness(PRSC1,MOD) = 
+      if PRSC2 == PRSC1
+      then findWitness2(PRSC1,MOD,PRL1,PRL2,MPTS3,TP)
+      else PRSC2
+      fi
+    if PRL1 := getInvTargetParams(PRSC1) /\
+      PRL2 := getExistVars(PRL1) /\
+      TES := eqs2TermSet(getEqs(getPrscModule(PRSC1))) /\
+      MPTS := getMapParamTS(MOD, TES, PRL2) /\
+      QI[TEL] := getPrscInvIndConl(PRSC1) /\
+      MPTS2 := paramList2Map(PRL1, TEL) /\
+      MPTS3 := (MPTS , MPTS2) /\
+      TP := map2TermPernSet(MPTS3,PRL1) /\
+      PRSC2 := doFindWitness(PRSC1,MOD,TP) .
+  ceq doFindWitness(PRSC1, MOD, ({TEL} , TP)) = 
+      prsc(getPrscModule(PRSC1),
+        myDownTerm(TE1, MOD) ' 'implies ' QI '`( myDownTermL(TEL, MOD) '`),
+        TE3,
+        'true '`, ' 'the ' 'witness ' 'is ' myDownTermL(TEL3, MOD),
+        getPrscMapEqs(PRSC1),
+        getInvTagetName(PRSC1),
+        getInvTargetParams(PRSC1),
+        getInvTransName(PRSC1),
+        getInvTransParams(PRSC1),
+        getPrscILemma(PRSC1)) 
+    if '_implies_[TE1, QI[TEL2]] := getPrscMetaReduceCmd(PRSC1) /\
+      TE3 := '_implies_[TE1, QI[TEL]] /\
+      getTerm(metaReduce(MOD, TE3)) == 'true.Bool /\
+      TEL3 := diffTermList(TEL2, TEL) .
+  eq doFindWitness(PRSC1,MOD, TP) = PRSC1 [owise] .
+
+***(
+  after the tool cannot find witness by using all sub-terms in the O-C fragment,
+  the tool try to find other terms that does not occur in the O-C fragment
+   ParamList#1: full param list of the inv
+   ParamList#2: existential param list of the inv
+   MapParamTS : old mapping from param to term set
+   TermPernSet: old set of term lists that can be use to instantiate inv
+)
+  op findWitness2 : IPSGProofScore Module ParamList 
+      ParamList MapParamTS TermPernSet -> IPSGProofScore .
+  ceq findWitness2(PRSC1, MOD, PRL1, PRL2, MPTS, ({TEL} , TP)) = 
+      doFindWitness(PRSC1,MOD,TP3) 
+    if MPTS2 := findOtherTerms(PRSC1, MOD, PRL2, TP) /\
+      TP2 := map2TermPernSet((MPTS , MPTS2), PRL1) /\
+      TP3 := substractSet(TP2, TP) .
+
+***(
+  find additional map from param to terms
+  such that terms match the param and the terms do not exist in the O-C fragment
+)
+  op findOtherTerms : IPSGProofScore Module ParamList TermPernSet -> MapParamTS .
+  ceq findOtherTerms(PRSC1, MOD, PRL1, ({TEL} , TP)) = 
+      MPTS
+    if '_implies_[TE1, QI[TEL2]] := getPrscMetaReduceCmd(PRSC1) /\
+      TE3 := '_implies_[TE1, QI[TEL]] /\
+      TE4 := getTerm(metaReduce(MOD, TE3)) /\
+      MPTS := extractMapParamT(TE4,PRL1) /\
+      MPTS =/= (empty).MapParamTS .
+  eq findOtherTerms(PRSC1, MOD, PRL1, TP) = empty [owise] .
+
+***(
+  find additional map by extracting the returned term
+)
+  op extractMapParamT : Term ParamList -> MapParamTS .
+  op extractMapParamTL : TermList ParamList -> MapParamTS .
+  ceq extractMapParamT('_=_[C1, TE2], PRL1) = 
+      param(getName(C1), getType(C1)) |-> TE2 
+    if existInPL?(C1, PRL1) .
+  ceq extractMapParamT('_=_[TE1, C2], PRL1) = 
+      param(getName(C2), getType(C2)) |-> TE1 
+    if existInPL?(C2, PRL1) .
+  ceq extractMapParamT(QI[TE1, TEL], PRL1) = 
+      appendM(extractMapParamT(TE1, PRL1), extractMapParamTL(TEL, PRL1)) 
+    if QI =/= '_=_ .
+  eq extractMapParamT(TE1, PRL1) = (empty).MapParamTS [owise] .
+  eq extractMapParamTL(empty, PRL1) = empty .
+  eq extractMapParamTL((TE1 , TEL), PRL1) = 
+    appendM(extractMapParamT(TE1, PRL1), extractMapParamTL(TEL, PRL1)) .
+
+--- a constant is in a param list
+  op existInPL? : Term ParamList -> Bool .
+  eq existInPL?(C1, (nil).ParamList) = false .
+  eq existInPL?(C1, param(QI,QI2) PRL1) = 
+    (getName(C1) == QI and getType(C1) == QI2)
+    or existInPL?(C1, PRL1) .
+
+--- create map 1-1 from a param to a term
+  op paramList2Map : ParamList TermList -> MapParamTS .
+  eq paramList2Map((nil).ParamList, TEL) = (empty).MapParamTS .
+  eq paramList2Map(PA1 PRL1, (TE1 , TEL)) =
+    if isExistential(PA1)
+    then paramList2Map(PRL1, TEL)
+    else ((PA1 |-> TE1) , paramList2Map(PRL1, TEL))
+    fi .
 endfm
 
 ***(
@@ -1844,25 +1929,27 @@ mod IPSG-HANDLE is
              else chooseStrategyCS(PRSC1, extractIfCondsT(TE2))
              fi .
 
---- if the invariant consists of many -or-, -and- operators
   op loopGenPrsc1 : IPSGProofScore IPSGModuleSpec IPSGInputSpec 
     TermList EquationSet -> PrscList .
   ceq loopGenPrsc1(PRSC1, MS1, INSP1, TEL, EQS) =
       loopGenPrsc2(PRSC1, MS1, INSP1, TEL, EQS)
-    if max-node2 == 0 .
+    if (not csFirst) or isBaseCase?(PRSC1) .
+ 
+--- if the invariant consists of many -or-, -and- operators
   ceq loopGenPrsc1(PRSC1, MS1, INSP1, TEL, EQS) =
       loopGenPrsc2(PRSC1, MS1, INSP1, TEL, EQS)
-    if MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\ 
-       TE := getTerm(metaReduce(MOD, getPrscInvIndHyp(PRSC1))) /\
+    if csFirst /\ 
+       MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\ 
+       TE := getTerm(metaRewrite(MOD, getPrscInvIndHyp(PRSC1), 1)) /\
        not isComplicated2(TE) .
   ceq loopGenPrsc1(PRSC1, MS1, INSP1, TEL, EQS)
     = loopGenPrsc1(
         addEquation2Prsc(PRSC1, EQ1,1), MS1, INSP1, TEL, EQS)
       loopGenPrsc1(
         addEquation2Prsc(PRSC1, EQ2,2), MS1, INSP1, TEL, EQS)
-  if max-node2 > 0 /\
+  if csFirst /\
     MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\ 
-    TE := getTerm(metaReduce(MOD, getPrscInvIndHyp(PRSC1))) /\
+    TE := getTerm(metaRewrite(MOD, getPrscInvIndHyp(PRSC1), 1)) /\
     isComplicated2(TE) /\
     TE2 := if extractIfCondsT(TE) == empty 
            then chooseStrategyCS(PRSC1, extractSplitCasesT(TE))

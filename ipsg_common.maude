@@ -15,10 +15,14 @@ fmod PARAM is
   op pnull : -> Param [ctor] .
   op getParamName : Param -> Qid .
   op getParamType : Param -> Qid .
+--- is an existential quantifier variable?
+  op isExistential : Param -> Bool .
 
   vars Q1 Q2 Q3 Q4 : Qid .
   eq getParamName(param(Q1,Q2)) = Q1 .
   eq getParamType(param(Q1,Q2)) = Q2 .
+  eq isExistential(param(Q1,Q2)) = 
+    (find(string(Q1), "?", 0) == 0) . 
 endfm
 
 view Param from TRIV to PARAM is
@@ -80,6 +84,32 @@ fmod PARAM-LIST is
     else doFindMatches(P1, PRL2, PRL3)
     fi .
 
+--- whether or not there exists an existential quantifier variable in a given term list
+  op hasExistVar : ParamList -> Bool .
+  eq hasExistVar((nil).ParamList) = false .
+  eq hasExistVar(P1 PRL1) = 
+    if isExistential(P1)
+    then true
+    else hasExistVar(PRL1)
+    fi .
+
+--- return a list of existential quantifier variables
+  op getExistVars : ParamList -> ParamList .
+  eq getExistVars((nil).ParamList) = (nil).ParamList .
+  eq getExistVars(P1 PRL1) = 
+    if isExistential(P1) 
+    then (P1 getExistVars(PRL1))
+    else getExistVars(PRL1)
+    fi .
+
+--- return a list of universal quantifier variables
+  op getUnivVars : ParamList -> ParamList .
+  eq getUnivVars((nil).ParamList) = (nil).ParamList .
+  eq getUnivVars(P1 PRL1) = 
+    if isExistential(P1) 
+    then getUnivVars(PRL1)
+    else (P1 getUnivVars(PRL1))
+    fi .
 endfm
 
 ***(
@@ -107,6 +137,16 @@ fmod IPSG-INPUT-INVARIANT is
   eq getInvName(invariant(QI, PAL1)) = QI .
 
   eq getInvParams(invariant(QI, PAL1)) = PAL1 .
+
+--- whether or not there exists an existential quantifier variable in a given term list
+  op hasExistVar : Invariant -> Bool .
+--- return a list of existential quantifier variables
+  op getExistVars : Invariant -> ParamList .
+--- return a list of universal quantifier variables
+  op getUnivVars : Invariant -> ParamList .
+  eq hasExistVar(invariant(QI, PAL1)) = hasExistVar(PAL1) .
+  eq getExistVars(invariant(QI, PAL1)) = getExistVars(PAL1) .
+  eq getUnivVars(invariant(QI, PAL1)) = getUnivVars(PAL1) .
 endfm
 
 ***( 
@@ -183,6 +223,21 @@ fmod IPSG-INPUT-INV-LIST is
   eq remove(INV, (nil).InvList) = (nil).InvList .
   eq remove(INV, (INV INVL)) = INVL .
   eq remove(INV, (INV1 INVL)) = INVL [owise] .
+
+  op existentialInvs : InvList -> InvList .
+  op universalInvs : InvList -> InvList .
+  eq existentialInvs((nil).InvList) = (nil).InvList .
+  eq existentialInvs(INV INVL) = 
+    if hasExistVar(INV)
+    then INV existentialInvs(INVL)
+    else existentialInvs(INVL)
+    fi .
+  eq universalInvs((nil).InvList) = (nil).InvList .
+  eq universalInvs(INV INVL) = 
+    if hasExistVar(INV)
+    then universalInvs(INVL)
+    else INV universalInvs(INVL)
+    fi .
 endfm
 
 view InvariantTarget from TRIV to IPSG-INPUT-INVARIANT-TARGET is
@@ -294,6 +349,15 @@ fmod TERM-PERMUTATION-SET is
   protecting SET{TermsPermutation} * 
   (sort NeSet{TermsPermutation} to NeTermPernSet, 
    sort Set{TermsPermutation} to TermPernSet) .
+
+  op substractSet : TermPernSet TermPernSet -> TermPernSet .
+  vars TP TP2 : TermPernSet .
+  var TEL : TermList .
+  eq substractSet(TP, empty) = TP .
+  eq substractSet(empty, TP) = empty .
+  eq substractSet(TP, { TEL }) = delete({ TEL }, TP) .
+  eq substractSet(TP, ({ TEL } , TP2) ) 
+    = substractSet(delete({ TEL }, TP), TP2) .
 endfm
 
 
@@ -631,6 +695,7 @@ fmod IPSG-PROOF-SCORE is
   op getPrscInvIndHyp : IPSGProofScore -> Term . --- get induction hypothesis
   op getPrscInvIndConl : IPSGProofScore -> Term . --- get induction conclusion
   op getPrscILemma : IPSGProofScore -> IPSGLemmas . --- get lemmas info
+  op isBaseCase? : IPSGProofScore -> Bool .
 
   vars M1 M2 : Module .
   vars QIL1 QIL2 QIL3 : QidList .
@@ -674,6 +739,10 @@ fmod IPSG-PROOF-SCORE is
   op doGetPrscInvIndConl : Term -> Term .
   eq doGetPrscInvIndConl('_implies_[T1, T2]) = T2 .
   eq doGetPrscInvIndConl(T1) = T1 [owise print "676 something wrong"] .
+  
+  ceq isBaseCase?(PRSC1) = false
+    if '_implies_[T1, T2] := getPrscMetaReduceCmd(PRSC1) .
+  eq isBaseCase?(PRSC1) = true [owise] .
 
 ***( meta module expression +
     + inv name
@@ -925,6 +994,17 @@ fmod PARAM2TERMSET-MAP is
   pr MAP{Param, TermSet} * 
     (sort Map{Param, TermSet} to MapParamTS, 
       sort Entry{Param, TermSet} to EntryParamTS) .
+  op insertEntry : Param TermSet MapParamTS -> MapParamTS .
+  op appendM : MapParamTS MapParamTS -> MapParamTS .
+  vars P P2 : Param .
+  vars TES TES2 : TermSet .
+  vars M M2 : MapParamTS .
+  eq insertEntry(P, TES, (P |-> TES2 , M)) 
+    = (P |-> appendTS(TES2, TES) , M) .
+  eq insertEntry(P, TES, M) = insert(P,TES,M) [owise] . 
+  eq appendM(empty, M2) = M2 .
+  eq appendM((P |-> TES2 , M), M2) 
+    = appendM(M, insertEntry(P, TES2, M2)) .
 endfm
 
 fmod TUPLE-TERM-PERMUTATION-SET is

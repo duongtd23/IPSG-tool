@@ -37,8 +37,28 @@ fmod IPSG-CONFIG is
   op checkLmFirst : -> Bool .
   eq checkLmFirst = false .
 
+***(
+  enable/disable spaces after commas in the generated proof scores
+)
   op addSpace : -> Bool .
   eq addSpace = false .
+
+***(
+  enable/disable case splitting first before reduction
+)
+  op csFirst : -> Bool .
+  eq csFirst = false .
+
+
+***(
+  maximum number of logical connectives
+  if the number of logical connectives in the property > maxLogConn,
+  then case splitting is applied before reduction
+  the logical connectives include: conjuntion, disjuntion, implication, xor 
+  recommendation: 7
+)
+  op maxLogConn : -> Nat .
+  eq maxLogConn = 10 .
 endfm
 
 ***(
@@ -570,6 +590,10 @@ fmod TERM-SET is
   
   vars TE TE2 : Term .
   vars TES TES2 : TermSet .
+  vars C C2 : Constant .
+  vars V V2 : Variable .
+  vars Q Q2 : Qid .
+  vars TEL : TermList .
   
   --- eq TE \in empTS = false .
   eq TE \in TE = true .
@@ -584,6 +608,28 @@ fmod TERM-SET is
   eq termS2TermL(empTS) = (empty).TermList .
   eq termS2TermL(TE) = TE .
   eq termS2TermL(TE $ TES) = (TE , termS2TermL(TES)) .
+
+***(
+  filter out terms containing ?-symbol prefix,
+  i.e., terms containing existential quantifiers
+)
+  op removeExTerm : TermSet -> TermSet .
+  eq removeExTerm(empTS) = empTS .
+  eq removeExTerm(TE $ TES) = 
+    if containExSubTerm(TE)
+    then removeExTerm(TES)
+    else (TE $ removeExTerm(TES))
+    fi .
+
+  op containExSubTerm  : Term -> Bool .
+  op containExSubTerm' : TermList -> Bool .
+  eq containExSubTerm(C) = (find(string(getName(C)), "?", 0) == 0) .
+--- seem unnecessary
+  eq containExSubTerm(V) = (find(string(getName(V)), "?", 0) == 0) .
+  eq containExSubTerm(Q[TEL]) = containExSubTerm'(TEL) .
+  eq containExSubTerm'((empty).TermList) = false .
+  eq containExSubTerm'((TE , TEL)) = 
+    (containExSubTerm(TE) or containExSubTerm'(TEL)) .
 endfm
 
 ***(
@@ -636,6 +682,7 @@ endfm
 
 fmod TERM-ANALYSIS is 
   pr LIST-UTILS .
+  pr IPSG-CONFIG .
 
 --- first nat is the current number of nodes,
 --- second nat is the maximum number of nodes,
@@ -648,8 +695,8 @@ fmod TERM-ANALYSIS is
   op max-node : -> Nat .
   eq max-node = 0 .
   op max-node2 : -> Nat .
-  --- eq max-node2 = 20 .     --- normally 30, but need to change to 40 (NSLPK)
-  eq max-node2 = 0 .   
+  --- eq max-node2 = 20 .
+  eq max-node2 = 500000 .   
 
   op getMaxNodes : -> Nat .
   eq getMaxNodes = max-node .
@@ -692,7 +739,20 @@ fmod TERM-ANALYSIS is
   eq countNodes2(TE) = countNodes(TE) .
   eq countNodes2( (TE , TL) ) = countNodes(TE) + countNodes2(TL) .
 
-  eq isComplicated2(TE) = (countNodes(TE) > getMaxNodes2) .
+  --- eq isComplicated2(TE) = (countNodes(TE) > getMaxNodes2) .
+  eq isComplicated2(TE) = (noLogConn(TE) > maxLogConn) .
+
+***(
+  count the number of logical connectives in the given term
+)
+  op noLogConn  : Term     -> Nat .
+  op noLogConn2 : TermList -> Nat .
+  ceq noLogConn(Q[TL]) = noLogConn2(TL)
+    if Q == '_xor_ or Q == '_and_ or Q == '_or_ or Q == '_implies_ .
+  eq noLogConn(TE) = 1 [owise] .
+
+  eq noLogConn2(empty) = 0 .
+  eq noLogConn2( (TE , TL) ) = noLogConn(TE) + noLogConn2(TL) .
 
 endfm
 
@@ -724,5 +784,15 @@ fmod TERM-UTILS is
   eq checkExist(TE1, Q1[TL1]) = checkExist2(TE1, TL1) .
   eq checkExist(TE1, TE2) = false [owise] .
 
+***(
+  return the difference between two term lists having a same size
+)
+  op diffTermList : TermList TermList -> TermList .
+  eq diffTermList(empty,TL1) = empty .
+  eq diffTermList((TE1 , TL1) , (TE2 , TL2)) = 
+    if TE1 == TE2 
+    then diffTermList(TL1, TL2) 
+    else (TE2 , diffTermList(TL1, TL2))
+    fi .
 endfm
 
