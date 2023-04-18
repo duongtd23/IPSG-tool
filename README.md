@@ -1,4 +1,4 @@
-## IPSG - Invariant proof scores generation. 
+## IPSG - Invariant Proof Scores Generator. 
 
 IPSG is implemented on top of CafeInMaude (https://github.com/ariesco/CafeInMaude), which is the world's second implementation of CafeOBJ.
 IPSG requires Maude version not lower than Maude 3.2 (https://github.com/SRI-CSL/Maude).
