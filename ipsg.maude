@@ -384,7 +384,7 @@ mod MTP is
  crl [textFileNoParse] :
      < cafeInMaude : CIM | out: Read, state: parseTextFileContents, AtS >
   => < cafeInMaude : CIM | out: "", state: print&idle, AtS >
-     write(stdout, cafeInMaude, "No parse for file.\n")
+     write(stdout, cafeInMaude, "CafeInMaude cannot parse file.\n")
   if QIL := tokenize(Read) /\
      noParse(N) := metaParse(IPSGGRAMMAR, QIL, '@Input@) .
 

@@ -806,7 +806,7 @@ fmod IPSG-PROOF-SCORE is
   eq toOpenCloseQidList(QI1, PRSC, M1) = 
     qid("-->") getPrscComment(PRSC) '\n
     mod2OpenCloseQidList(QI1, getPrscModule(PRSC), M1, getPrscMapEqs(PRSC), 
-      '\t 'red getPrscReductionCmd(PRSC) ' '.) .
+      tabQ 'red getPrscReductionCmd(PRSC) ' '.) .
 
 --- add 1 more equation (case splitting) and update list of lemmas
   op updatePrsc : IPSGProofScore Equation Nat IPSGLemmas -> IPSGProofScore .
@@ -967,7 +967,7 @@ fmod IPSG-PROOF-SCORE-LIST is
   eq $toOpenCloseStr(QI, PRSC, M1) = 
     "--> " + qidList2Str(getPrscComment(PRSC)) + "\n" +
     mod2OpenCloseStr(QI, getPrscModule(PRSC), M1, getPrscMapEqs(PRSC), 
-      "\tred " + qidList2Str(getPrscReductionCmd(PRSC)) + " .") .
+      tabS + "red " + qidList2Str(getPrscReductionCmd(PRSC)) + " .") .
 endfm
 
 ***(

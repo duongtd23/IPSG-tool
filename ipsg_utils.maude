@@ -8,6 +8,7 @@
 fmod IPSG-CONFIG is
   pr STRING .
   pr NAT .
+  pr QID-LIST .
 
 --- turn on or off automatically try to use an invariant as a lemma
 --- when a sub-case reduced to false
@@ -59,6 +60,15 @@ fmod IPSG-CONFIG is
 )
   op maxLogConn : -> Nat .
   eq maxLogConn = 10 .
+
+***(
+  tab space
+)
+  op tabQ : -> QidList .  --- tab qid
+  op tabS : -> String .  --- tab string
+--- we use tab as 2 spaces
+  eq tabQ = ' ' .
+  eq tabS = "  " .
 endfm
 
 ***(
@@ -273,13 +283,13 @@ fmod TO-QID-LIST is
 
   op importList2QidList : ImportList -> QidList .
   eq importList2QidList((nil).ImportList) = (nil).QidList .
-  eq importList2QidList(protecting Q . IL) = '\n '\t 'protecting Q '. importList2QidList(IL) .
-  eq importList2QidList(including Q . IL) = '\n '\t 'including Q '. importList2QidList(IL) .
-  eq importList2QidList(extending Q . IL) = '\n '\t 'extending Q '. importList2QidList(IL) .
+  eq importList2QidList(protecting Q . IL) = '\n tabQ 'protecting Q '. importList2QidList(IL) .
+  eq importList2QidList(including Q . IL) = '\n tabQ 'including Q '. importList2QidList(IL) .
+  eq importList2QidList(extending Q . IL) = '\n tabQ 'extending Q '. importList2QidList(IL) .
 
   op sortSetDecl2QidList : SortSet -> QidList .
   eq sortSetDecl2QidList(none) = (nil).QidList .
-  eq sortSetDecl2QidList(S) = '\n '\t 'sorts S '. .
+  eq sortSetDecl2QidList(S) = '\n tabQ 'sorts S '. .
 
   op subSortsDecl2QidList : SubsortDeclSet -> QidList .
   eq subSortsDecl2QidList(none) = (nil).QidList .
@@ -287,7 +297,7 @@ fmod TO-QID-LIST is
   op ops2QidList : OpDeclSet -> QidList .
   eq ops2QidList(none) = (nil).QidList .
   eq ops2QidList(op Q1 : TL -> Q2 [none] . OPDS) = 
-    '\n '\t 'op Q1 ': TL '-> Q2 '.
+    '\n tabQ 'op Q1 ': TL '-> Q2 '.
     ops2QidList(OPDS) .
 
   op mas2QidList : MembAxSet -> QidList .
@@ -296,7 +306,7 @@ fmod TO-QID-LIST is
   op eqs2QidList : EquationSet Module -> QidList .
   eq eqs2QidList(none, MOD1) = (nil).QidList .
   eq eqs2QidList(eq T1 = T2 [none] . EQS, MOD1) = 
-    --- '\n '\t 'eq ' '`( myDownTerm(T1, MOD1) '`) ' '= myDownTerm(T2, MOD1) '. 
+    --- '\n tabQ 'eq ' '`( myDownTerm(T1, MOD1) '`) ' '= myDownTerm(T2, MOD1) '. 
     aEq2QidList(myDownTerm(T1, MOD1), myDownTerm(T2, MOD1), MOD1)
     eqs2QidList(EQS, MOD1) .
 
@@ -312,34 +322,34 @@ fmod TO-QID-LIST is
       do-mapEqs2QidList(MAP1, MOD1, s(N1))
     fi .
   eq do-mapEqs2QidList2(eq T1 = T2 [none] ., MOD1) = 
-  ---   --- '\n '\t 'eq ' '`( myDownTerm(T1, MOD1) '`) ' '= myDownTerm(T2, MOD1) '. 
+  ---   --- '\n tabQ 'eq ' '`( myDownTerm(T1, MOD1) '`) ' '= myDownTerm(T2, MOD1) '. 
     aEq2QidList(myDownTerm(T1, MOD1), myDownTerm(T2, MOD1), MOD1) .
 
   op aEq2QidList : QidList QidList Module -> QidList .
 
   --- eq aEq2QidList(QL1 '= QL2, 'true, MOD1) =
-  ---   '\n '\t 'eq QL1 '= QL2 '. .
+  ---   '\n tabQ 'eq QL1 '= QL2 '. .
   --- eq aEq2QidList(QL1, QL2, MOD1) =
-  ---   '\n '\t 'eq ' '`( QL1 '`) ' '= QL2 '. .
+  ---   '\n tabQ 'eq ' '`( QL1 '`) ' '= QL2 '. .
 
   --- eq aEq2QidList(Q1, Q2, MOD1) =
-    --- '\n '\t 'eq Q1 '= Q2 '. .
+    --- '\n tabQ 'eq Q1 '= Q2 '. .
   --- eq aEq2QidList(Q1, Q2, MOD1) =
-    --- '\n '\t 'eq Q2 '= Q1 '. .
+    --- '\n tabQ 'eq Q2 '= Q1 '. .
   --- eq aEq2QidList(QL1, Q2, MOD1) =
-    --- '\n '\t 'eq QL1 ' '= Q2 '. .
-    --- '\n '\t 'eq ' '`( QL1 '`) ' '= Q2 '. .
+    --- '\n tabQ 'eq QL1 ' '= Q2 '. .
+    --- '\n tabQ 'eq ' '`( QL1 '`) ' '= Q2 '. .
   --- eq aEq2QidList(Q1, QL2, MOD1) =
-    --- '\n '\t 'eq QL2 ' '= Q1 ' '. .
-    --- '\n '\t 'eq ' '`( QL2 '`) ' '= Q1 '. .
+    --- '\n tabQ 'eq QL2 ' '= Q1 ' '. .
+    --- '\n tabQ 'eq ' '`( QL2 '`) ' '= Q1 '. .
   eq aEq2QidList(QL1, QL2, MOD1) =
-    '\n '\t 'eq QL1 '= QL2 '. .
-    --- '\n '\t 'eq ' '`( QL1 '`) ' '= QL2 '. [owise] .
+    '\n tabQ 'eq QL1 '= QL2 '. .
+    --- '\n tabQ 'eq ' '`( QL1 '`) ' '= QL2 '. [owise] .
 
   
   --- eq eqs2QidList(eq T1 = T2 [ATTR] . EQS) = 
-    --- '\n '\t 'eq downTerm(T1, 'error) '= downTerm(T1, 'error) 
-    --- '\n '\t eqs2QidList(EQS) .
+    --- '\n tabQ 'eq downTerm(T1, 'error) '= downTerm(T1, 'error) 
+    --- '\n tabQ eqs2QidList(EQS) .
 
 --- '_=_['l8.Label,'pc['s.Sys,'r1.Pid]]
   op myDownTerm : Term Module -> QidList .
@@ -353,7 +363,7 @@ fmod TO-QID-LIST is
   eq myDownTerm(V1, MOD1) = getName(V1) .
   ceq myDownTerm(Q1[TEL1], MOD1) = 
     if find(STR1, "_", 0) == notFound 
-    then replaceEqWithoutUnderSc(string(Q1), TEL1, MOD1)
+    then replaceEqWithoutUnderSc(STR1, TEL1, MOD1)
     else
       if noOccurences(STR1, "_") == size-TL(TEL1) 
       then
@@ -365,19 +375,6 @@ fmod TO-QID-LIST is
       fi
     fi
   if STR1 := replace(string(Q1)) .
-
---- handle associate commutative term,
---- e.g., _and_[Term-list], _+_[Term-list]
-  op handleDownTermAC : TermList Module String -> QidList .
-  eq handleDownTermAC((empty).TermList, MOD1, STR2) = (nil).QidList .
-  --- eq handleDownTermAnd(T1, MOD1) = myDownTerm(T1, MOD1) .
-  eq handleDownTermAC((T1 , TEL1), MOD1, STR2) =
-    '`( myDownTerm(T1, MOD1) handleDownTermAC1(TEL1, MOD1, STR2) '`) .
-  
-  op handleDownTermAC1 : TermList Module String -> QidList .
-  eq handleDownTermAC1((empty).TermList, MOD1, STR2) = (nil).QidList .
-  eq handleDownTermAC1((T1 , TEL1), MOD1, STR2) =
-    qid(STR2) myDownTerm(T1, MOD1) handleDownTermAC1(TEL1, MOD1, STR2) .
 
   op replaceEqWithoutUnderSc : String TermList Module -> QidList .
   eq replaceEqWithoutUnderSc(STR1, TEL1, MOD1) = 
@@ -399,6 +396,18 @@ fmod TO-QID-LIST is
       fi
     fi .
 
+--- handle associate commutative term,
+--- e.g., _and_[Term-list], _+_[Term-list]
+  op handleDownTermAC : TermList Module String -> QidList .
+  eq handleDownTermAC((empty).TermList, MOD1, STR2) = (nil).QidList .
+  --- eq handleDownTermAnd(T1, MOD1) = myDownTerm(T1, MOD1) .
+  eq handleDownTermAC((T1 , TEL1), MOD1, STR2) =
+    '`( myDownTerm(T1, MOD1) handleDownTermAC1(TEL1, MOD1, STR2) '`) .
+  
+  op handleDownTermAC1 : TermList Module String -> QidList .
+  eq handleDownTermAC1((empty).TermList, MOD1, STR2) = (nil).QidList .
+  eq handleDownTermAC1((T1 , TEL1), MOD1, STR2) =
+    ' qid(STR2) ' myDownTerm(T1, MOD1) handleDownTermAC1(TEL1, MOD1, STR2) .
 
   op aOp2String : OpDecl -> String .
   eq aOp2String(op Q1 : TL -> Q2 [none] .) = 
@@ -431,7 +440,7 @@ fmod TO-QID-LIST is
 
   op sortSetDecl2Str : SortSet -> String .
   eq sortSetDecl2Str(none) = "" .
-  eq sortSetDecl2Str(Q1) = "\n\tsorts " + string1(Q1) + " ." .
+  eq sortSetDecl2Str(Q1) = "\n" + tabS + "sorts " + string1(Q1) + " ." .
 
   op subSortsDecl2Str : SubsortDeclSet -> String .
   eq subSortsDecl2Str(none) = "" .
@@ -439,7 +448,7 @@ fmod TO-QID-LIST is
   op ops2Str : OpDeclSet -> String .
   eq ops2Str(none) = "" .
   eq ops2Str(op Q1 : nil -> Q2 [none] . OPDS) = 
-    "\n\top " + string1(Q1) + " : -> " + string1(Q2) + " ." +
+    "\n" + tabS + "op " + string1(Q1) + " : -> " + string1(Q2) + " ." +
     ops2Str(OPDS) .
 
   op mas2Str : MembAxSet -> String .
@@ -465,7 +474,7 @@ fmod TO-QID-LIST is
 
   op aEq2Str : String String Module -> String .
   eq aEq2Str(STR1, STR2, MOD1) =
-    "\n\teq " + STR1 + 
+    "\n" + tabS + "eq " + STR1 + 
     if substr(STR2,0,1) == " " 
     then " ="
     else " = " 
