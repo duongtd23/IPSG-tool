@@ -8,7 +8,7 @@ Once Maude is installed, you can try to run the tool with the following commands
 ```
 maude -allow-files ipsg.maude
 load examples/Qlock/qlock.cafe .
-load examples/Qlock/input1.cafe .
+load examples/Qlock/input.cafe .
 ```
 
-where the first command starts the tool, the second command loads the Qlock specification, the last command loads the input file, which asks the tool to generate the proof score for `inv1` of Qlock.
+where the first command starts the tool, the second command loads the Qlock specification, and the last command loads the input file, which asks the tool to generate the proof scores to prove Qlock enjoys the mutual exclusion properties (i.e., the proof scores of `inv1` and `inv2`).

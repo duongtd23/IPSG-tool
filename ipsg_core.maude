@@ -225,6 +225,7 @@ fmod HANDLE-EQS-CS is
   pr LIST-UTILS .
   pr TERM-UTILS .
   pr TERM-ANALYSIS .
+  pr CONVERSION .
 
   sort EqPair .
   op $_,_$ : Equation Equation -> EqPair [ctor] .
@@ -345,22 +346,29 @@ fmod HANDLE-EQS-CS is
   op isConstructorT : Term OpDeclSet Module -> Bool .
   eq isConstructorT(TE1, none, MOD) = false .
   eq isConstructorT(Q1[TL1], op Q1 : TYL -> TY1 [ATTS1 ctor ATTS2] . OPS, MOD) =
-    if checkMatchTermL(TL1, TYL, MOD) then
-      true
-    else 
-      isConstructorT(Q1[TL1], OPS, MOD)
+    if checkTermMatchOp(Q1[TL1], op Q1 : TYL -> TY1 [ATTS1 ctor ATTS2] ., MOD)
+    then true
+    else isConstructorT(Q1[TL1], OPS, MOD)
     fi .
   eq isConstructorT(TE1, OP1 OPS, MOD) = isConstructorT(TE1, OPS, MOD) .
 
-  op checkMatchTermL : TermList TypeList Module -> Bool .
-  eq checkMatchTermL(empty, (nil).TypeList, MOD) = true .
-  eq checkMatchTermL((TE1 , TL1), TY1 TYL, MOD) =
-    if wellFormed(MOD, qid("VAR:" + string(TY1)) <- TE1) then
-      checkMatchTermL(TL1, TYL, MOD)
-    else
-      false
-    fi .
-  eq checkMatchTermL(TL1, TYL, MOD) = false [owise] .
+  op checkTermMatchOp : Term OpDecl Module -> Bool .
+  eq checkTermMatchOp(TE1, OP1, MOD) =
+    metaMatch(MOD, convertOp2Term(OP1) , TE1, nil, 0) =/= noMatch .
+
+***(
+  to convert an operator to its term representation, e.g.,
+  op _||_ : DataL DataL -> DataL {} is converted to
+  '_||_['VAR0:DataL, 'VAR1:DataL]
+)
+  op convertOp2Term : OpDecl -> Term .
+  op doConvertOp2Term : TypeList Nat -> TermList .
+  eq convertOp2Term(op Q1 : TYL -> TY1 [ATTS1] .) =
+    Q1[doConvertOp2Term(TYL, 0)] .
+  eq doConvertOp2Term((nil).TypeList, N) = (empty).TermList .
+  eq doConvertOp2Term((TY1 TYL), N) = 
+    qid("VAR" + string(N,10) + ":" + string(TY1)) , 
+    doConvertOp2Term(TYL, s(N)) .
 
 --- check a term exist in a set of equations
   op checkTermExistEqs : Term EquationSet -> Bool .
@@ -1176,14 +1184,31 @@ fmod ISPG-HANDLE-INVS is
     MapInvTTermPernSet TermList EquationSet Nat -> PrscList .
   --- this case do not need to use another lemma, 
   --- but the remaining prsc still returns true
+  ceq tryUseMt1Lm2(PRSC1, MS1, INVL, MITTPS, TE1, EQS, N) =
+      tryUseMt1Lm2(
+        addEquation2Prsc(PRSC1, EQ1,1), MS1, INVL, MITTPS, TE1, EQS, N)
+      tryUseMt1Lm2(
+        addEquation2Prsc(PRSC1, EQ2,2), MS1, INVL, MITTPS, TE1, EQS, N) 
+    if MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\ 
+      TE2 := getTerm(metaReduce(MOD, TE1)) /\
+      TE2 =/= 'true.Bool /\
+      TE2 =/= 'false.Bool /\
+      TE3 := if extractIfCondsT(TE2) == empty 
+             then chooseTermCS(extractSplitCasesT(TE2))
+             else chooseTermCS(extractIfCondsT(TE2))
+             fi /\
+      $ EQ1 , EQ2 $ := makeEqsTF(TE3, MOD, getPrscModule(PRSC1)) .
+
   ceq tryUseMt1Lm2(PRSC1, MS1, INVL, MITTPS, TEL2, EQS, N) =
-      if TE1 == 'true.Bool then
-        PRSC1
-      else
-        tryUseMt1Lm2'(PRSC1, MS1, MOD, INVL, MITTPS, TEL2, EQS, N)
+      if TE1 == 'true.Bool 
+      then addComment2Prsc(PRSC1, 'true)
+      else tryUseMt1Lm2'(PRSC1, MS1, MOD, INVL, MITTPS, TEL2, EQS, N)
       fi
     if MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\ 
-      TE1 := getTerm(metaReduce(MOD, getPrscMetaReduceCmd(PRSC1))) .
+      TE1 := getTerm(metaReduce(MOD, getPrscMetaReduceCmd(PRSC1))) /\
+      (TEL2 == empty or-else 
+       getTerm(metaReduce(MOD, TEL2)) == 'true.Bool or-else
+       getTerm(metaReduce(MOD, TEL2)) == 'false.Bool) .
 
   op tryUseMt1Lm2' : IPSGProofScore IPSGModuleSpec Module InvList 
     MapInvTTermPernSet TermList EquationSet Nat -> PrscList .
