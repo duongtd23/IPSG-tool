@@ -23,7 +23,7 @@ mod! LABEL {
   eq (ws = cs) = false .
 }
 
-mod! PID {
+mod* PID {
   [ErrPid Pid < Pid&Err]
   op none : -> ErrPid
   var I : Pid
@@ -67,16 +67,12 @@ mod! QUEUE(E :: TRIVerr) {
   ceq (top(enq(Q,Y)) = X) = true if top(Q) = X .
 }
 
-view TRIVerr2PID from TRIVerr to PID {
-  sort Elt -> Pid,
-  sort ErrElt -> ErrPid,
-  sort Elt&Err -> Pid&Err,
-  op err -> none
-}
-
 mod* QLOCK {
-  pr(LABEL + PID)
-  pr(QUEUE(E <= TRIVerr2PID))
+  pr(LABEL)
+  pr(QUEUE(PID{sort Elt -> Pid,
+               sort ErrElt -> ErrPid,
+               sort Elt&Err -> Pid&Err,
+               op err -> none}))
   [Sys]
 -- any initial state
   op init : -> Sys {constr}
