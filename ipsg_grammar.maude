@@ -1,7 +1,7 @@
 load cafeinmaude3/grammar.maude
 
 ***(
-  define file input syntax
+  define syntax for the input file
 )
 fmod IPSG-INPUT-SYNTAX is 
   pr INPUT .
@@ -15,7 +15,8 @@ fmod IPSG-INPUT-SYNTAX is
   op generate_`(_`)induction on_only_. : @Token@ @NeTokenList@ @Token@ @NeTokenList@ -> Decl .
   op generate_`(_`)induction on_exclude_. : @Token@ @NeTokenList@ @Token@ @NeTokenList@ -> Decl .
   op generate_`(_`). : @Token@ @NeTokenList@ -> Decl .
-  op inv_`(_`) . : @Token@ @NeTokenList@ -> Decl .
+  op inv_`(_`). : @Token@ @NeTokenList@ -> Decl .
+  op :enableCsFirst`(_`). : @Token@ -> Decl .
   op ipsgopen_._close : @Token@ DeclList -> InputModule .
 endfm
 

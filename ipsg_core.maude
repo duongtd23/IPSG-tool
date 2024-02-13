@@ -315,15 +315,34 @@ fmod HANDLE-EQS-CS is
   ceq makeEqsTF4('_=_[TE1, TE2], MOD, PRSCMOD) = 
     if checkExist(TE1, TE2) 
     then $ eq TE2 = TE1 [none] . , eq '_=_[TE2, TE1] = 'false.Bool [none] . $
-    else makeEqsTF5(TE1, TE2, MOD, PRSCMOD)
+    else 
+      if checkExist(TE2, TE1)
+      then $ eq TE1 = TE2 [none] . , eq '_=_[TE1, TE2] = 'false.Bool [none] . $
+      else makeEqsTF5(TE1, TE2, MOD, PRSCMOD)
+      fi
     fi
   if not(TE1 :: Constant) /\ not(TE2 :: Constant) .
   eq makeEqsTF4(TE1, MOD, PRSCMOD) = 
     $ eq TE1 = 'true.Bool [none] . , eq TE1 = 'false.Bool [none] . $ [owise] .
 
-*** check occurence to build equation
   op makeEqsTF5 : Term Term Module Module -> EqPair .
-  eq makeEqsTF5(TE1, TE2, MOD, PRSCMOD) = 
+  ceq makeEqsTF5(TE1, TE2, MOD, PRSCMOD) = 
+    if sortLeq(MOD, TY1, TY2) 
+    then $ eq TE2 = TE1 [none] . , eq '_=_[TE2, TE1] = 'false.Bool [none] . $
+    else
+      if sortLeq(MOD, TY2, TY1)
+      then $ eq TE1 = TE2 [none] . , eq '_=_[TE1, TE2] = 'false.Bool [none] . $
+      else makeEqsTF6(TE1, TE2, MOD, PRSCMOD)
+      fi
+    fi
+  if TY1 := getType(metaReduce(MOD,TE1)) /\
+     TY2 := getType(metaReduce(MOD,TE2)) /\
+     TY1 =/= TY2 .
+  eq makeEqsTF5(TE1, TE2, MOD, PRSCMOD) = makeEqsTF6(TE1, TE2, MOD, PRSCMOD) [owise] .
+
+*** check occurence to build equation
+  op makeEqsTF6 : Term Term Module Module -> EqPair .
+  eq makeEqsTF6(TE1, TE2, MOD, PRSCMOD) = 
     if checkTermExistEqs(TE1, getEqs(PRSCMOD)) and
         not(checkTermExistEqs(TE2, getEqs(PRSCMOD))) 
     then $ eq TE2 = TE1 [none] . , eq '_=_[TE2, TE1] = 'false.Bool [none] . $
@@ -467,9 +486,10 @@ fmod SPEC-MODULE-ANALYZE is
 
   op getInitOps : Qid OpDeclSet -> OpDeclSet .
   eq getInitOps(Q1, none) = none .
-  eq getInitOps(Q1, op Q2 : nil -> Q1 [ATTS1 ctor ATTS2] . OPS) =
-    (op Q2 : nil -> Q1 [ATTS1 ctor ATTS2] .)
-    getInitOps(Q1, OPS) .
+  ceq getInitOps(Q1, op Q2 : TL1 -> Q1 [ATTS1 ctor ATTS2] . OPS) =
+    (op Q2 : TL1 -> Q1 [ATTS1 ctor ATTS2] .)
+    getInitOps(Q1, OPS) 
+  if not occurs(Q1,TL1) .
   eq getInitOps(Q1, OP OPS) = getInitOps(Q1, OPS) [owise] .
 
 endfm
@@ -512,129 +532,122 @@ endfm
 )
 fmod INPUT-IPSG-PARSE is
   pr META-LEVEL .
+  pr LEXICAL .
   pr IPSG-INPUT-SPEC .
 
-  vars T1 T2 T3 T4 T5 : Term .
-  vars QI1 QI2 QI3 : Qid .
+  vars T1 T2 T3 T4 T5 T2' T3' : Term .
+  vars Q QI1 QI2 QI3 : Qid .
   vars TL TL1 TL2 TL3 : TermList .
   vars STR1 STR2 : String .
   vars QIL QIL2 : QidList .
+  vars IL IL2 : InvList .
+  var ITL : InvTargetList .
+  var CFG : ConfigInput .
+  var INSP : IPSGInputSpec .
 
   op parseInputSpec : Term ~> IPSGInputSpec .
-  eq parseInputSpec('ipsgopen_._close['token[T1], T2]) =
-    inputSpec(downTerm(T1,'error),
-        parseInvs(T2),
-        parseInvsTarget(T2)) .
-
-  op parseInvs : Term ~> InvList .
-  op parseInvsTarget : Term ~> InvTargetList .
-  op parseInvParams : Term ~> ParamList .
+  op doParseInput : Term IPSGInputSpec ~> IPSGInputSpec .
+  op parseDecl : Term IPSGInputSpec ~> IPSGInputSpec .
   op parseInvParams2 : TermList ~> ParamList .
+  op parseEnableCs : Term -> ConfigInput .
 
-  eq parseInvs('inv_`(_`).['token[T1], 'neTokenList['__[TL]]]) = 
-    invariant(downTerm(T1, 'error), parseInvParams2(TL)) .
-  
+  eq parseInputSpec('ipsgopen_._close['token[T1], T2]) =
+    doParseInput(T2,
+      inputSpec(downTerm(T1,'error),nil,nil,defaltConfig)) .
+
+  eq doParseInput('__[T2, T3], INSP) =
+    doParseInput(T3,parseDecl(T2,INSP)) .
+  eq doParseInput(T3, INSP) = parseDecl(T3,INSP) [owise] .
+
+  eq parseDecl(':enableCsFirst`(_`).['token[T1]], 
+      inputSpec(Q,IL,ITL,CFG))
+    = inputSpec(Q,IL,ITL, parseEnableCs(T1)) .
+
+  eq parseDecl('inv_`(_`).['token[T1], 'neTokenList['__[TL]]], 
+      inputSpec(Q,IL,ITL,CFG)) = 
+    inputSpec(Q,IL 
+      invariant(downTerm(T1, 'error), parseInvParams2(TL)), 
+      ITL, CFG) .
 --- only one param
-  eq parseInvs('inv_`(_`).['token[T1], 'neTokenList[T2]]) = 
-    invariant(downTerm(T1, 'error), parseParam(downTerm(T2, 'error))) .
+  eq parseDecl('inv_`(_`).['token[T1], 'neTokenList[T2]],
+      inputSpec(Q,IL,ITL,CFG)) = 
+    inputSpec(Q,IL 
+      invariant(downTerm(T1, 'error), 
+                parseParam(downTerm(T2, 'error))),
+      ITL, CFG) .
 
-  eq parseInvs('__['inv_`(_`).['token[T1], 'neTokenList['__[TL]]], T3]) = 
-    invariant(downTerm(T1, 'error), parseInvParams2(TL)) 
-    parseInvs(T3) .
-  
---- only one param
-  eq parseInvs('__['inv_`(_`).['token[T1], 'neTokenList[T2]], T3]) = 
-    invariant(downTerm(T1, 'error), parseParam(downTerm(T2, 'error))) 
-    parseInvs(T3) .
+  eq parseDecl('generate_`(_`)induction`on_exclude_.
+    ['token[T1], 'neTokenList[T3], 'token[T2], 'neTokenList[T4]],
+    inputSpec(Q,IL,ITL,CFG)) = 
+    inputSpec(Q,IL,ITL
+     invariantTarget3(
+      invariant(downTerm(T1, 'error), 
+        if isTrueTermList(T3)
+        then parseInvParams2($isTrueTermList(T3))
+        else parseParam(downTerm(T3, 'error))
+        fi), 
+      parseParam(downTerm(T2, 'error)), 
+      if isTrueTermList(T4)
+      then downTermList($isTrueTermList(T4))
+      else downTerm(T4, 'error)
+      fi),
+     CFG) .
 
-  ceq parseInvs('__[QI1[TL], T1]) = parseInvs(T1) 
-    if QI1 =/= 'inv_`(_`). .
-  ceq parseInvs(QI1[TL]) = (nil).InvList
-    if QI1 =/= '__ /\ QI1 =/= 'inv_`(_`). .
+  eq parseDecl('generate_`(_`)induction`on_only_.
+    ['token[T1], 'neTokenList[T3], 'token[T2], 'neTokenList[T4]],
+    inputSpec(Q,IL,ITL,CFG)) = 
+    inputSpec(Q,IL,ITL
+     invariantTarget2(
+      invariant(downTerm(T1, 'error), 
+        if isTrueTermList(T3)
+        then parseInvParams2($isTrueTermList(T3))
+        else parseParam(downTerm(T3, 'error))
+        fi), 
+      parseParam(downTerm(T2, 'error)), 
+      if isTrueTermList(T4)
+      then downTermList($isTrueTermList(T4))
+      else downTerm(T4, 'error)
+      fi),
+     CFG) .
+
+  eq parseDecl('generate_`(_`)induction`on_.
+    ['token[T1], 'neTokenList[T3], 'token[T2]],
+    inputSpec(Q,IL,ITL,CFG)) = 
+    inputSpec(Q,IL,ITL
+     invariantTarget(
+      invariant(downTerm(T1, 'error), 
+        if isTrueTermList(T3)
+        then parseInvParams2($isTrueTermList(T3))
+        else parseParam(downTerm(T3, 'error))
+        fi), 
+      parseParam(downTerm(T2, 'error))),
+     CFG) .
+
+  eq parseDecl('generate_`(_`).['token[T1], 'neTokenList[T3]],
+    inputSpec(Q,IL,ITL,CFG)) = 
+    inputSpec(Q,IL,ITL
+     invariantTarget(
+      invariant(downTerm(T1, 'error), 
+        if isTrueTermList(T3)
+        then parseInvParams2($isTrueTermList(T3))
+        else parseParam(downTerm(T3, 'error))
+        fi), 
+      pnull),
+     CFG) .
+
+  eq parseDecl(T1, INSP) = INSP [owise 
+    print T1 " is not parsed."] .
+
+  ceq parseEnableCs(T1) = configInput(true,N:Nat)
+    if Q := downTerm(T1, 'error) /\
+       N:Nat := rat(printTokens(Q),10) .
+  eq parseEnableCs(T1) = configInput(true,maxLogConn) [owise] .
 
   op isTrueTermList : Term -> Bool .
   eq isTrueTermList('__[TL]) = true .
   eq isTrueTermList(T1) = false [owise] .
   op $isTrueTermList : Term -> TermList .
   eq $isTrueTermList('__[TL]) = TL .
-
-  eq parseInvsTarget('generate_`(_`)induction`on_exclude_.
-    ['token[T1], 'neTokenList[T3], 'token[T2], 'neTokenList[T4]]) = 
-    invariantTarget3(
-      invariant(downTerm(T1, 'error), 
-        if isTrueTermList(T3)
-        then parseInvParams2($isTrueTermList(T3))
-        else parseParam(downTerm(T3, 'error))
-        fi), 
-      parseParam(downTerm(T2, 'error)), 
-      if isTrueTermList(T4)
-      then downTermList($isTrueTermList(T4))
-      else downTerm(T4, 'error)
-      fi) .
-  eq parseInvsTarget('generate_`(_`)induction`on_only_.
-    ['token[T1], 'neTokenList[T3], 'token[T2], 'neTokenList[T4]]) = 
-    invariantTarget2(
-      invariant(downTerm(T1, 'error), 
-        if isTrueTermList(T3)
-        then parseInvParams2($isTrueTermList(T3))
-        else parseParam(downTerm(T3, 'error))
-        fi), 
-      parseParam(downTerm(T2, 'error)), 
-      if isTrueTermList(T4)
-      then downTermList($isTrueTermList(T4))
-      else downTerm(T4, 'error)
-      fi) .
-  eq parseInvsTarget('generate_`(_`)induction`on_.
-    ['token[T1], 'neTokenList[T3], 'token[T2]]) = 
-    invariantTarget(
-      invariant(downTerm(T1, 'error), 
-        if isTrueTermList(T3)
-        then parseInvParams2($isTrueTermList(T3))
-        else parseParam(downTerm(T3, 'error))
-        fi), 
-      parseParam(downTerm(T2, 'error))) .
-  eq parseInvsTarget('generate_`(_`).
-    ['token[T1], 'neTokenList[T3]]) = 
-    invariantTarget(
-      invariant(downTerm(T1, 'error), 
-        if isTrueTermList(T3)
-        then parseInvParams2($isTrueTermList(T3))
-        else parseParam(downTerm(T3, 'error))
-        fi), 
-      pnull) .
-
-  eq parseInvsTarget('__['generate_`(_`)induction`on_exclude_.
-      ['token[T1], 'neTokenList[T3], 'token[T2], 'neTokenList[T4]], T5]) = 
-    parseInvsTarget('generate_`(_`)induction`on_exclude_.
-      ['token[T1], 'neTokenList[T3], 'token[T2], 'neTokenList[T4]])
-    parseInvsTarget(T5) .
-  eq parseInvsTarget('__['generate_`(_`)induction`on_only_.
-      ['token[T1], 'neTokenList[T3], 'token[T2], 'neTokenList[T4]], T5]) = 
-    parseInvsTarget('generate_`(_`)induction`on_only_.
-      ['token[T1], 'neTokenList[T3], 'token[T2], 'neTokenList[T4]])
-    parseInvsTarget(T5) .
-  eq parseInvsTarget('__['generate_`(_`)induction`on_.
-      ['token[T1], 'neTokenList[T3], 'token[T2]], T5]) = 
-    parseInvsTarget('generate_`(_`)induction`on_.
-      ['token[T1], 'neTokenList[T3], 'token[T2]])
-    parseInvsTarget(T5) .
-  eq parseInvsTarget('__['generate_`(_`).
-      ['token[T1], 'neTokenList[T2]], T3]) = 
-    parseInvsTarget('generate_`(_`).
-      ['token[T1], 'neTokenList[T2]])
-    parseInvsTarget(T3) .
-
-  ceq parseInvsTarget('__[QI1[TL], T1]) = parseInvsTarget(T1) 
-    if QI1 =/= 'generate_`(_`)induction`on_exclude_. /\
-      QI1 =/= 'generate_`(_`)induction`on_only_. /\
-      QI1 =/= 'generate_`(_`)induction`on_. /\
-      QI1 =/= 'generate_`(_`). .
-  ceq parseInvsTarget(QI1[TL]) = (nil).InvTargetList
-    if QI1 =/= '__ /\ 
-      QI1 =/= 'generate_`(_`)induction`on_exclude_. /\
-      QI1 =/= 'generate_`(_`)induction`on_only_. /\
-      QI1 =/= 'generate_`(_`)induction`on_. /\
-      QI1 =/= 'generate_`(_`). .
 
   eq parseInvParams2(T3) = 
       parseParam(downTerm(T3, 'error)) .
@@ -899,7 +912,6 @@ fmod ISPG-HANDLE-INVS is
   pr TERM-PERMUTATION-SET .
   pr TO-QID-LIST .
   pr ISPG-LEMMA-CONJECTURE .
-  pr IPSG-CONFIG .
   pr TERM-CHECK-RESULT-LIST .
   pr PARSE-TERM .
   pr HANDLE-EQS-CS .
@@ -1658,16 +1670,23 @@ mod IPSG-HANDLE is
     = param(toLowerCaseQ(QI1), QI2) applyToCInvParams(PRL1) .
 
   op applyToCTranParams : TypeList Param ParamList -> ParamList .
-  op applyToCTranParams1 : TypeList Param Nat ParamList -> ParamList .
-  eq applyToCTranParams(TL1, PA1, PRL1) = applyToCTranParams1(TL1, PA1, 1, PRL1) .
-  eq applyToCTranParams1((nil).TypeList, PA1, N1, PRL1) = (nil).ParamList .
-  eq applyToCTranParams1(T1 TL1, param(QI1, QI2), N1, PRL1) 
-    = if T1 == QI2 then
-        param(QI1, QI2) applyToCTranParams1(TL1, param(QI1, QI2), N1, PRL1)
+  eq applyToCTranParams(TL1, PA1, PRL1) = applyToCTranParams1(TL1, PA1, 1, PRL1,nil) .
+
+--- the last arg store the result
+  op applyToCTranParams1 : TypeList Param Nat ParamList ParamList -> ParamList .
+  eq applyToCTranParams1((nil).TypeList, PA1, N1, PRL1,PRL2) = PRL2 .
+  eq applyToCTranParams1(T1 TL1, param(QI1, QI2), N1, PRL1,PRL2) 
+    = if T1 == QI2 
+      then
+        if occurs(param(QI1, QI2), PRL2)
+        then applyToCTranParams1(TL1, param(QI1, QI2), s(N1), PRL1, PRL2
+          param(qid(uniqueParamName(const-paramName + string(N1,10), PRL1)), T1))
+        else
+          applyToCTranParams1(TL1, param(QI1, QI2), N1, PRL1, PRL2 param(QI1, QI2))
+        fi
       else
-        param(qid(uniqueParamName(const-paramName + string(N1,10),
-          PRL1)), T1)
-        applyToCTranParams1(TL1, param(QI1, QI2), s(N1), PRL1)
+        applyToCTranParams1(TL1, param(QI1, QI2), s(N1), PRL1, PRL2
+          param(qid(uniqueParamName(const-paramName + string(N1,10), PRL1)), T1))
       fi .
 
   op genOps : ParamList -> OpDeclSet .
@@ -1804,7 +1823,7 @@ mod IPSG-HANDLE is
     if INVT1 :: InvariantTarget2 .
   eq genPrscInit(INSP1, (none).OpDeclSet, MS1, INVT1, N1, EQS, EQS2) 
     = (nil).PrscList .
-  ceq genPrscInit(INSP1, op QI1 : nil -> QI2 [ATTS1] . OPS1, MS1, INVT1, 
+  ceq genPrscInit(INSP1, op QI1 : TL1 -> QI2 [ATTS1] . OPS1, MS1, INVT1, 
       N1, EQS, EQS2) =
     PRSCL1
     genPrscInit(INSP1, OPS1, MS1, INVT1, N1, EQS, EQS2)
@@ -1812,18 +1831,20 @@ mod IPSG-HANDLE is
       QI3 := getInvName(INVT1) /\
       PA1 := applyToCIndVarParam(getInvIndVar(INVT1)) /\
       PRL1 := applyToCInvParams(getInvParams(INVT1)) /\
+      PRL2 := applyToCTranParams(TL1, PA1, PRL1) /\
       PRSCL1 := loopGenPrsc0(prsc-init(
         fmod qid(const-modName + string(QI3) + "-0") is 
           protecting getInputSpecMod(INSP1) .
           sorts none .
           none
-          genOps(PA1 PRL1 applyToCTranParams((nil).TypeList, PA1, PRL1))
+          genOps(PA1 PRL1 PRL2)
           none --- mb
           none --- eqs
         endfm,
         QI3,
         QI1,
         PRL1,
+        PRL2,
         PA1,
         MS1
       ), MS1, INSP1, empty, EQS2) .
@@ -1958,24 +1979,24 @@ mod IPSG-HANDLE is
     TermList EquationSet -> PrscList .
   ceq loopGenPrsc1(PRSC1, MS1, INSP1, TEL, EQS) =
       loopGenPrsc2(PRSC1, MS1, INSP1, TEL, EQS)
-    if (not csFirst) or isBaseCase?(PRSC1) .
+    if (not isCsFirstEn(INSP1)) or isBaseCase?(PRSC1) .
  
 --- if the invariant consists of many -or-, -and- operators
   ceq loopGenPrsc1(PRSC1, MS1, INSP1, TEL, EQS) =
       loopGenPrsc2(PRSC1, MS1, INSP1, TEL, EQS)
-    if csFirst /\ 
+    if isCsFirstEn(INSP1) /\ 
        MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\ 
        TE := getTerm(metaRewrite(MOD, getPrscInvIndHyp(PRSC1), 1)) /\
-       not isComplicated2(TE) .
+       not isComplicated2(TE, getMaxLogConn(INSP1)) .
   ceq loopGenPrsc1(PRSC1, MS1, INSP1, TEL, EQS)
     = loopGenPrsc1(
         addEquation2Prsc(PRSC1, EQ1,1), MS1, INSP1, TEL, EQS)
       loopGenPrsc1(
         addEquation2Prsc(PRSC1, EQ2,2), MS1, INSP1, TEL, EQS)
-  if csFirst /\
+  if isCsFirstEn(INSP1) /\
     MOD := tempMod2(getPrscModule(PRSC1), MS1, getPrscILemma(PRSC1)) /\ 
     TE := getTerm(metaRewrite(MOD, getPrscInvIndHyp(PRSC1), 1)) /\
-    isComplicated2(TE) /\
+    isComplicated2(TE, getMaxLogConn(INSP1)) /\
     TE2 := if extractIfCondsT(TE) == empty 
            then chooseStrategyCS(PRSC1, extractSplitCasesT(TE))
            else chooseStrategyCS(PRSC1, extractIfCondsT(TE))

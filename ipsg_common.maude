@@ -250,6 +250,14 @@ fmod IPSG-INPUT-INV-TARGET-LIST is
    sort List{InvariantTarget} to InvTargetList) .
 endfm
 
+fmod CONFIG-INPUT is
+  pr IPSG-CONFIG .
+  sort ConfigInput .
+  op configInput : Bool Nat -> ConfigInput [ctor] .
+  op defaltConfig : -> ConfigInput .
+  eq defaltConfig = configInput(csFirst,maxLogConn) .
+endfm
+
 ***( INPUT-SPEC =
     module name (inv) +
     invariants list (can be used as lemmas) +
@@ -258,34 +266,42 @@ endfm
 fmod IPSG-INPUT-SPEC is
   pr IPSG-INPUT-INV-TARGET-LIST .
   pr IPSG-INPUT-INV-LIST .
+  pr CONFIG-INPUT .
   sort IPSGInputSpec .
   
   op null : -> IPSGInputSpec [ctor] .
-  op inputSpec : Qid InvList InvTargetList -> IPSGInputSpec [ctor] .
+  op inputSpec : Qid InvList InvTargetList ConfigInput -> IPSGInputSpec [ctor] .
   op getInputSpecMod : IPSGInputSpec -> Qid .
   --- op getInputSpecInvTarget : IPSGInputSpec -> InvariantTarget .
   op getInputSpecInvs : IPSGInputSpec -> InvList .
   op getInputSpecInvsTarget : IPSGInputSpec -> InvTargetList .
+  op getInputConfig : IPSGInputSpec -> ConfigInput .
+  op isCsFirstEn : IPSGInputSpec -> Bool .
+  op getMaxLogConn : IPSGInputSpec -> Nat .
 
   var Q : Qid .
   vars IL IL2 : InvList .
   var ITL : InvTargetList .
-
-  eq getInputSpecMod(inputSpec(Q, IL, ITL)) = Q .
-  eq getInputSpecInvsTarget(inputSpec(Q, IL, ITL)) = ITL .
-  eq getInputSpecInvs(inputSpec(Q, IL, ITL)) = IL .
-
-  op addLmsInv : IPSGInputSpec InvList -> IPSGInputSpec .
-  eq addLmsInv(inputSpec(Q,IL,ITL), IL2) = inputSpec(Q,IL IL2, ITL) .
-
-  op convLms2InvTs : InvList Param -> InvTargetList .
+  var CFG : ConfigInput .
   var INV : Invariant .
   var INVS : InvList .
-  var IT : InvariantTarget .
-  var ITS : InvTargetList .
+
+  eq getInputSpecMod(inputSpec(Q, IL, ITL, CFG)) = Q .
+  eq getInputSpecInvsTarget(inputSpec(Q, IL, ITL,CFG)) = ITL .
+  eq getInputSpecInvs(inputSpec(Q, IL, ITL,CFG)) = IL .
+
+  op addLmsInv : IPSGInputSpec InvList -> IPSGInputSpec .
+  op convLms2InvTs : InvList Param -> InvTargetList .
+
+  eq addLmsInv(inputSpec(Q,IL,ITL,CFG), IL2) = inputSpec(Q,IL IL2, ITL,CFG) .
   eq convLms2InvTs((nil).InvList, P:Param) = (nil).InvTargetList .
   eq convLms2InvTs((INV INVS), P:Param) = 
     invariantTarget(INV, P:Param) convLms2InvTs(INVS, P:Param) .
+  
+  eq isCsFirstEn(
+    inputSpec(Q,IL,ITL,configInput(B:Bool,N:Nat))) = B:Bool .
+  eq getMaxLogConn(
+    inputSpec(Q,IL,ITL,configInput(B:Bool,N:Nat))) = N:Nat .
 endfm
 
 fmod MY-TUPLE{C1 :: TRIV, C2 :: TRIV} is
@@ -394,12 +410,9 @@ fmod IPSG-REDUCTION-TERM-PRSC is
   op genLeftSideReductTerm : Module Qid ParamList -> Term .
   eq genLeftSideReductTerm(MOD1, QI1, PRL1) = QI1[ genEqParamsTerm(MOD1, PRL1) ] .
   op genEqParamsTerm : Module ParamList -> TermList .
-  eq genEqParamsTerm(MOD1, param(QI1, QI2) (nil).ParamList) 
-    = getTerm(metaParse(MOD1, QI1, QI2)) .
-  ceq genEqParamsTerm(MOD1, param(QI1, QI2) PRL1) 
-      = getTerm(metaParse(MOD1, QI1, QI2)) ,
-          genEqParamsTerm(MOD1, PRL1)
-    if PRL1 =/= (nil).ParamList .
+  eq genEqParamsTerm(MOD1, (nil).ParamList) = (empty).TermList .
+  eq genEqParamsTerm(MOD1, param(QI1, QI2) PRL1) 
+    = getTerm(metaParse(MOD1, QI1, QI2)) , genEqParamsTerm(MOD1, PRL1) .
 
 --- module + inv name + transition name + inv params + transition params + param induction on
   op genRightSideReductTerm : Module Qid Qid ParamList ParamList Qid -> Term .
@@ -408,43 +421,34 @@ fmod IPSG-REDUCTION-TERM-PRSC is
 
 --- module + transition name + inv params + transition params + param induction on
   op genRightEqParamsTerm : Module Qid ParamList ParamList Qid -> TermList .
-  eq genRightEqParamsTerm(MOD1, QI1, param(QI2, QI3) (nil).ParamList, PRL1, QI4)
-    = if QI2 == QI4 then
-        QI1[ genEqParamsTerm(MOD1, PRL1) ]
-      else
-        getTerm(metaParse(MOD1, QI2, QI3))
-      fi .
-  ceq genRightEqParamsTerm(MOD1, QI1, param(QI2, QI3) PRL2, PRL1, QI4)
-    = (if QI2 == QI4 then
-        (QI1[ genEqParamsTerm(MOD1, PRL1) ] , 
-          genRightEqParamsTerm(MOD1, QI1, PRL2, PRL1, QI4))
-      else
-        (getTerm(metaParse(MOD1, QI2, QI3)), 
-          genRightEqParamsTerm(MOD1, QI1, PRL2, PRL1, QI4))
-      fi)
-    if PRL2 =/= (nil).ParamList .
+  eq genRightEqParamsTerm(MOD1, QI1, (nil).ParamList, PRL1, QI4)
+    = (empty).TermList .
+  eq genRightEqParamsTerm(MOD1, QI1, param(QI2, QI3) PRL2, PRL1, QI4) = 
+    (if QI2 == QI4 
+     then QI1[ genEqParamsTerm(MOD1, PRL1) ]
+     else getTerm(metaParse(MOD1, QI2, QI3))
+     fi) ,
+    genRightEqParamsTerm(MOD1, QI1, PRL2, PRL1, QI4) .
 
----- module + inv name + init state name + inv params + param induction on
-  op genReductionTermInit : Module Qid Qid ParamList Param -> Term .
-  eq genReductionTermInit(MOD1, QI1, QI2, PRL1, PR1) =
-    QI1[ genInitEqParamsTerm(MOD1, QI2, PRL1, PR1) ] .
+---- mod + inv name + init state name + inv params + init state params + param induction on
+  op genReductionTermInit : Module Qid Qid ParamList ParamList Param -> Term .
+  eq genReductionTermInit(MOD1, QI1, QI2, PRL1, PRL2, PR1) =
+    QI1[ genInitEqParamsTerm(MOD1, QI2, PRL1, PRL2, PR1) ] .
 
----- module + init state name + inv params + param induction on
-  op genInitEqParamsTerm : Module Qid ParamList Param -> TermList .
-  eq genInitEqParamsTerm(MOD1, QI3, param(QI1, QI2) (nil).ParamList, param(QI4, QI5)) = 
-    if QI1 == QI4 then
-      getTerm(metaParse(MOD1, QI3, QI5))
-    else
-      getTerm(metaParse(MOD1, QI1, QI2))
-    fi .
-  ceq genInitEqParamsTerm(MOD1, QI3, param(QI1, QI2) PRL1, param(QI4, QI5)) = 
-      (if QI1 == QI4 then 
-        getTerm(metaParse(MOD1, QI3, QI5))
-      else
-        getTerm(metaParse(MOD1, QI1, QI2))
-      fi) , genInitEqParamsTerm(MOD1, QI3, PRL1, param(QI4, QI5))
-    if PRL1 =/= (nil).ParamList .
-
+---- module + init state name + inv params + init state params + param induction on
+  op genInitEqParamsTerm : Module Qid ParamList ParamList Param -> TermList .
+  eq genInitEqParamsTerm(MOD1, QI3, (nil).ParamList, PRL2, param(QI4, QI5)) = 
+    (empty).TermList .
+  eq genInitEqParamsTerm(MOD1, QI3, param(QI1, QI2) PRL1, PRL2, param(QI4, QI5)) = 
+    (if QI1 == QI4 
+    then 
+      if PRL2 == nil
+      then getTerm(metaParse(MOD1, QI3, QI2))
+      else QI3[ genEqParamsTerm(MOD1, PRL2) ]
+      fi
+    else getTerm(metaParse(MOD1, QI1, QI2))
+    fi) , 
+    genInitEqParamsTerm(MOD1, QI3, PRL1, PRL2, param(QI4, QI5)) .
 endfm
 
 ***(
@@ -477,6 +481,7 @@ fmod IPSG-REDUCTION-PRSC is
   op genLeftSideReduct : Qid ParamList -> QidList .
   eq genLeftSideReduct(QI1, PRL1) = (QI1 '`( genEqParams(PRL1) '`) ) .
   op genEqParams : ParamList -> QidList .
+  eq genEqParams((nil).ParamList) = nil .
   eq genEqParams(param(QI1, QI2) (nil).ParamList) = QI1 .
   ceq genEqParams(param(QI1, QI2) PRL1) = 
     (QI1 '`, genEqParams(PRL1)) if PRL1 =/= (nil).ParamList .
@@ -502,25 +507,32 @@ fmod IPSG-REDUCTION-PRSC is
       fi)
     if PRL2 =/= (nil).ParamList .
 
-  op genReductionInit : Qid Qid ParamList Param -> QidList .
-  eq genReductionInit(QI1, QI2, PRL1, PR1) =
-    (QI1 '`( genInitEqParams(QI2, PRL1, PR1) '`) ) .
+  op genReductionInit : Qid Qid ParamList ParamList Param -> QidList .
+  eq genReductionInit(QI1, QI2, PRL1, PRL2, PR1) =
+    (QI1 '`( genInitEqParams(QI2, PRL1, PRL2, PR1) '`) ) .
 
-  op genInitEqParams : Qid ParamList Param -> QidList .
-  eq genInitEqParams(QI1, param(QI2, QI) (nil).ParamList, param(QI3, QI4)) =
-    if QI2 == QI3 then
-      QI1
-    else
-      QI2
+  op genInitEqParams : Qid ParamList ParamList Param -> QidList .
+  eq genInitEqParams(QI1, (nil).ParamList, PRL2, param(QI3, QI4)) = nil .
+  eq genInitEqParams(QI1, param(QI2, QI) (nil).ParamList, PRL2, param(QI3, QI4)) =
+    if QI2 == QI3 
+    then 
+      if PRL2 == nil
+      then QI1
+      else QI1 '`( genEqParams(PRL2) '`)
+      fi
+    else QI2
     fi .
-  ceq genInitEqParams(QI1, param(QI2, QI) PRL2, param(QI3, QI4)) =
-      (if QI2 == QI3 then
-        QI1
-      else
-        QI2
-      fi) '`, genInitEqParams (QI1, PRL2, param(QI3, QI4))
-    if PRL2 =/= (nil).ParamList .
-  
+  ceq genInitEqParams(QI1, param(QI2, QI) PRL1, PRL2, param(QI3, QI4)) =
+      (if QI2 == QI3 
+       then 
+        if PRL2 == nil
+        then QI1
+        else QI1 '`( genEqParams(PRL2) '`)
+        fi
+       else QI2
+       fi) '`, 
+      genInitEqParams (QI1, PRL1, PRL2, param(QI3, QI4))
+    if PRL1 =/= (nil).ParamList .
 endfm
 
 ***(
@@ -748,13 +760,14 @@ fmod IPSG-PROOF-SCORE is
     + inv name
     + init state name
     + inv params
+    + init state params
     + induction param
     )
-  op prsc-init : Module Qid Qid ParamList Param IPSGModuleSpec -> IPSGProofScore .
-  eq prsc-init(M1, QI1, QI2, PRL1, PR1, MS2) =
+  op prsc-init : Module Qid Qid ParamList ParamList Param IPSGModuleSpec -> IPSGProofScore .
+  eq prsc-init(M1, QI1, QI2, PRL1, PRL2, PR1, MS2) =
     prsc(M1,
-      genReductionInit(QI1, QI2, PRL1, PR1),
-      genReductionTermInit(tempMod(M1, MS2), QI1, QI2, PRL1, PR1),
+      genReductionInit(QI1, QI2, PRL1, PRL2, PR1),
+      genReductionTermInit(tempMod(M1, MS2), QI1, QI2, PRL1, PRL2, PR1),
       (nil).QidList,
       empty,
       QI1,
@@ -967,7 +980,7 @@ fmod IPSG-PROOF-SCORE-LIST is
   eq $toOpenCloseStr(QI, PRSC, M1) = 
     "--> " + qidList2Str(getPrscComment(PRSC)) + "\n" +
     mod2OpenCloseStr(QI, getPrscModule(PRSC), M1, getPrscMapEqs(PRSC), 
-      tabS + "red " + qidList2Str(getPrscReductionCmd(PRSC)) + " .") .
+      getPrscMetaReduceCmd(PRSC)) .
 endfm
 
 ***(

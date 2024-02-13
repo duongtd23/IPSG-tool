@@ -59,7 +59,7 @@ fmod IPSG-CONFIG is
   recommendation: 7
 )
   op maxLogConn : -> Nat .
-  eq maxLogConn = 10 .
+  eq maxLogConn = 12 .
 
 ***(
   tab space
@@ -182,7 +182,14 @@ fmod STRING-UTILS is
           noOccurences1(STR,STR2,s(N1),find(STR,STR2,N2) + 1)
         fi
       fi .
-
+--- trims unnecessary parent theses at the begining and the end
+  op trimParTheses : String -> String .
+  ceq trimParTheses(STR) = 
+      if find(STR, "(", 0) == 0 and rfind(STR, ")", sd(N1,1)) == sd(N1,1)
+      then substr(STR,1, sd(N1,2))
+      else STR 
+      fi 
+    if N1 := length(STR) .
 endfm
 
 --- map from index to equation,
@@ -425,8 +432,8 @@ fmod TO-QID-LIST is
 
   
 *********
-  op mod2OpenCloseStr : Qid Module Module MapNatEquation String -> String .
-  eq mod2OpenCloseStr(Q1, fmod Q is IL sorts SS . SSDS OPDS MAS EQS endfm, MOD1, MAP1, STR1) 
+  op mod2OpenCloseStr : Qid Module Module MapNatEquation Term -> String .
+  eq mod2OpenCloseStr(Q1, fmod Q is IL sorts SS . SSDS OPDS MAS EQS endfm, MOD1, MAP1, T1) 
     = "open " + string1(Q1) + " ." +
         --- importList2QidList(IL)
         sortSetDecl2Str(SS) + 
@@ -435,7 +442,7 @@ fmod TO-QID-LIST is
         mas2Str(MAS) +
         --- eqs2QidList(EQS, MOD1) '\n
         mapEqs2Str(MAP1, MOD1) + "\n" +
-        STR1 + 
+        tabS + "red " + trimParTheses(myDownTermStr(T1,MOD1)) + " ." +
       "\nclose" .
 
   op sortSetDecl2Str : SortSet -> String .
@@ -700,6 +707,7 @@ fmod TERM-ANALYSIS is
   op countNodes2 : TermList Nat Nat -> Bool .
   op isComplicated : Term -> Bool .
   op isComplicated2 : Term -> Bool . --- based on count nodes
+  op isComplicated2 : Term Nat -> Bool . --- based on count nodes
 
   op max-node : -> Nat .
   eq max-node = 0 .
@@ -750,6 +758,7 @@ fmod TERM-ANALYSIS is
 
   --- eq isComplicated2(TE) = (countNodes(TE) > getMaxNodes2) .
   eq isComplicated2(TE) = (noLogConn(TE) > maxLogConn) .
+  eq isComplicated2(TE,N) = (noLogConn(TE) > N) .
 
 ***(
   count the number of logical connectives in the given term
