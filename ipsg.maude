@@ -1,2 +1,2 @@
-load ipsg-without-run.maude
+load ipsg_without_run.maude
 erew run .

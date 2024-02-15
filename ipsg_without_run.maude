@@ -16,7 +16,7 @@ load cafeinmaude3/open_close_parsing.maude
 load cafeinmaude3/command_parsing.maude
 load cafeinmaude3/io.maude
 load time.maude
-load ipsg_core
+load ipsg_core.maude
 
 mod MTP is
  pr (MAYBE * (op maybe to null)){Oid} .
