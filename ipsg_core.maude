@@ -2,15 +2,10 @@
   core of the tool
   @author: duongtd
 )
-
-in ipsg_lms_handling.maude
---- temp, should be enable if test only Maude code in this file
---- set print attribute on .
+in ipsg_common.maude
 
 ***(
-  principle sort CheckResult, which is used in some other modules,
-  somewhat like ResultPair,
-  e.g, find Constant from a term
+  principle sort CheckResult, which is used in some other modules
 )
 fmod TERM-CHECK-RESULT is
   pr META-TERM .
@@ -911,7 +906,6 @@ fmod ISPG-HANDLE-INVS is
   pr PARAM-PERMUTATION-SET .
   pr TERM-PERMUTATION-SET .
   pr TO-QID-LIST .
-  pr ISPG-LEMMA-CONJECTURE .
   pr TERM-CHECK-RESULT-LIST .
   pr PARSE-TERM .
   pr HANDLE-EQS-CS .
@@ -943,16 +937,12 @@ fmod ISPG-HANDLE-INVS is
   vars OP1 OP2 : OpDecl .
   vars ATTS1 : AttrSet .
   vars MAP1 MAP2 : MapNatEquation .
-  vars TCL : TupleConstList .
-  --- vars CL : ConstList .
   vars CL : TermList .
-  vars MCV1 MCV2 : MapConstVar .
   vars V1 V2 : Variable .
   var LM : LemmaGenerated .
   vars STR1 STR2 : String .
   vars CRL : CheckResultList .
   vars CR CR1 CR2 : CheckResult .
-  --- vars MITPS : MapInvTermPernSet .
   vars TES TES2 TES3 : TermSet .
   vars MPTS MPTS2 MPTS3 : MapParamTS .
   vars MITTPS : MapInvTTermPernSet .
@@ -1675,19 +1665,20 @@ mod IPSG-HANDLE is
 --- the last arg store the result
   op applyToCTranParams1 : TypeList Param Nat ParamList ParamList -> ParamList .
   eq applyToCTranParams1((nil).TypeList, PA1, N1, PRL1,PRL2) = PRL2 .
-  eq applyToCTranParams1(T1 TL1, param(QI1, QI2), N1, PRL1,PRL2) 
+  ceq applyToCTranParams1(T1 TL1, param(QI1, QI2), N1, PRL1,PRL2) 
     = if T1 == QI2 
       then
         if occurs(param(QI1, QI2), PRL2)
-        then applyToCTranParams1(TL1, param(QI1, QI2), s(N1), PRL1, PRL2
-          param(qid(uniqueParamName(const-paramName + string(N1,10), PRL1)), T1))
+        then applyToCTranParams1(TL1, param(QI1, QI2), s(N2), PRL1, PRL2
+          param(qid(const-paramName + string(N2,10)), T1))
         else
           applyToCTranParams1(TL1, param(QI1, QI2), N1, PRL1, PRL2 param(QI1, QI2))
         fi
       else
-        applyToCTranParams1(TL1, param(QI1, QI2), s(N1), PRL1, PRL2
-          param(qid(uniqueParamName(const-paramName + string(N1,10), PRL1)), T1))
-      fi .
+        applyToCTranParams1(TL1, param(QI1, QI2), s(N2), PRL1, PRL2
+          param(qid(const-paramName + string(N2,10)), T1))
+      fi 
+    if N2 := genUniqueIndex(const-paramName, PRL1 PRL2, N1) .
 
   op genOps : ParamList -> OpDeclSet .
   eq genOps((nil).ParamList) = none .

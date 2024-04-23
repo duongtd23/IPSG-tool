@@ -50,21 +50,15 @@ fmod PARAM-LIST is
       checkParamNameExist(S, PL)
     fi .
 
-  op uniqueParamName : String ParamList -> String .
-  op doUniqueParamName : String ParamList Nat -> String .
-  eq uniqueParamName(S, PL) = 
-    if checkParamNameExist(S,PL) then
-      doUniqueParamName(S, PL, 1) 
-    else 
-      S 
-    fi .
-  ceq doUniqueParamName(S, PL, N) = 
-    if checkParamNameExist(S1,PL) then
-      doUniqueParamName(S, PL, s(N)) 
-    else 
-      S1
-    fi
-  if S1 := S + string(N,10) .
+  op genUniqueIndex : String ParamList -> Nat .
+  op genUniqueIndex : String ParamList Nat -> Nat .
+  eq genUniqueIndex(S,PL) = genUniqueIndex(S,PL,1) .
+  ceq genUniqueIndex(S,PL,N) =
+      if checkParamNameExist(S1,PL) 
+      then genUniqueIndex(S,PL,s(N))
+      else N
+      fi
+    if S1 := S + string(N,10) .
 
   op remove : ParamList Param -> ParamList .
   op doRemove : ParamList Param ParamList -> ParamList .
